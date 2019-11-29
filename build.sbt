@@ -1,6 +1,6 @@
 val scalaVersions = List("2.13.1", "2.12.10")
 
-ThisBuild / version := "0.0.1"
+ThisBuild / version := "0.0.2"
 ThisBuild / organization := "com.github.IndiscriminateCoding"
 ThisBuild / scalaVersion := scalaVersions.head
 

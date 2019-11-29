@@ -16,26 +16,27 @@ import org.http4s.client.Client
 import scala.concurrent.duration.FiniteDuration
 
 final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
-  f: HttpClient => HttpClient = identity,
+  f: HttpClient => Unit = _ => (),
   cf: Option[() => SslContextFactory] = Some(() => new SslContextFactory.Client()),
   rt: Long = defaultRequestTimeoutMs
 ) {
   private[this] def copy(
-    f: HttpClient => HttpClient = f,
+    f: HttpClient => Unit = f,
     cf: Option[() => SslContextFactory] = cf,
     rt: Long = rt
   ): JettyClientBuilder[F] = new JettyClientBuilder[F](f, cf, rt)
 
   def resource: Resource[F, Client[F]] = Resource
     .make(Sync[F].delay {
-      val c = f(new HttpClient(cf.map(_ ()).orNull) {
+      val c = new HttpClient(cf.map(_ ()).orNull) {
         override def newHttpRequest(c: HttpConversation, u: URI): HttpRequest = {
           val r = super.newHttpRequest(c, u)
           r.timeout(rt, TimeUnit.MILLISECONDS)
           r
         }
-      })
+      }
 
+      f(c)
       c.setFollowRedirects(false)
       c.setDefaultRequestContentType(null) // scalafix:ok
       c.start()
@@ -49,25 +50,35 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
 
   def withoutSslContextFactory: JettyClientBuilder[F] = copy(cf = None)
 
-  def withSslContextFactory(cf: SslContextFactory): JettyClientBuilder[F] =
+  def withSslContextFactory(cf: => SslContextFactory): JettyClientBuilder[F] =
     copy(cf = Some(() => cf))
 
   def withRequestTimeout(timeout: FiniteDuration): JettyClientBuilder[F] =
     copy(rt = timeout.toMillis)
 
   def withExecutor(e: Executor): JettyClientBuilder[F] = copy(f = { c =>
+    f(c)
     c.setExecutor(e)
-    c
   })
 
   def withIdleTimeout(timeout: FiniteDuration): JettyClientBuilder[F] = copy(f = { c =>
+    f(c)
     c.setIdleTimeout(timeout.toMillis)
-    c
   })
 
   def withConnectTimeout(timeout: FiniteDuration): JettyClientBuilder[F] = copy(f = { c =>
+    f(c)
     c.setConnectTimeout(timeout.toMillis)
-    c
+  })
+
+  def withMaxConnections(n: Int): JettyClientBuilder[F] = copy(f = { c =>
+    f(c)
+    c.setMaxConnectionsPerDestination(n)
+  })
+
+  def withMaxRequestsQueued(n: Int): JettyClientBuilder[F] = copy(f = { c =>
+    f(c)
+    c.setMaxRequestsQueuedPerDestination(n)
   })
 }
 
@@ -75,10 +86,14 @@ object JettyClientBuilder {
   private val defaultRequestTimeoutMs = 15000L
   private val defaultIdleTimeout = FiniteDuration(60, TimeUnit.SECONDS)
   private val defaultConnectTimeout = FiniteDuration(5, TimeUnit.SECONDS)
+  private val defaultMaxConnections = 64
+  private val defaultMaxRequestsQueued = 128
 
   def apply[F[_] : ConcurrentEffect]: JettyClientBuilder[F] = new JettyClientBuilder()
     .withIdleTimeout(defaultIdleTimeout)
     .withConnectTimeout(defaultConnectTimeout)
+    .withMaxConnections(defaultMaxConnections)
+    .withMaxRequestsQueued(defaultMaxRequestsQueued)
 
   private def fromHttpClient[F[_] : ConcurrentEffect](c: HttpClient): Client[F] = Client { r =>
     for {
