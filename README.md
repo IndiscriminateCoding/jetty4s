@@ -5,7 +5,7 @@
 Add this library to your **build.sbt**:
 
 ```scala
-libraryDependencies += "com.github.IndiscriminateCoding" %% "jetty4s-client" % "0.0.2"
+libraryDependencies += "com.github.IndiscriminateCoding" %% "jetty4s-client" % "0.0.3"
 ```
 
 Now you can use `jetty4s.client.JettyClientBuilder` to create a `Client`:
