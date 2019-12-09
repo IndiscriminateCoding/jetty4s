@@ -11,6 +11,7 @@ object RepeatedReadException extends MessageFailure {
   def inHttpResponse[F[_], G[_]](
     httpVersion: HttpVersion
   )(implicit F: Applicative[F], G: Applicative[G]): F[Response[G]] = F.pure(Response[G](
+    httpVersion = httpVersion,
     status = Status.InternalServerError
   ))
 }
