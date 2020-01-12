@@ -109,7 +109,7 @@ object JettyClientBuilder {
         })
         .content(h)
       _ = for (h <- r.headers) req.header(h.name.toString, h.value): Unit
-      _ <- Resource.make(h.write(r.body).start)(f => f.cancel >> f.join)
+      _ <- Resource.make(h.write(r.body).start)(_.cancel)
       _ <- Resource.make(Sync[F].delay(req.send(h)))(
         _ => Sync[F].delay(req.abort(InterruptedRequestException): Unit)
       )
