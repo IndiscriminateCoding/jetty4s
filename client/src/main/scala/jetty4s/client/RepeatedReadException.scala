@@ -1,6 +1,5 @@
 package jetty4s.client
 
-import cats.Applicative
 import org.http4s._
 
 object RepeatedReadException extends MessageFailure {
@@ -8,10 +7,8 @@ object RepeatedReadException extends MessageFailure {
 
   val cause: Option[Throwable] = None
 
-  def inHttpResponse[F[_], G[_]](
-    httpVersion: HttpVersion
-  )(implicit F: Applicative[F], G: Applicative[G]): F[Response[G]] = F.pure(Response[G](
+  def toHttpResponse[F[_]](httpVersion: HttpVersion): Response[F] = Response[F](
     httpVersion = httpVersion,
     status = Status.InternalServerError
-  ))
+  )
 }
