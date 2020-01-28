@@ -40,7 +40,7 @@ val scala213options = Seq(
   "-Ywarn-value-discard"
 )
 
-val http4sVersion = "0.21.0-M6"
+val http4sVersion = "0.21.0-RC2"
 val jettyVersion = "9.4.24.v20191120"
 
 lazy val jetty4s = (project in file("."))
