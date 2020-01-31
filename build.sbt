@@ -6,7 +6,8 @@ ThisBuild / version := "0.0.5"
 ThisBuild / organization := "com.github.IndiscriminateCoding"
 ThisBuild / scalaVersion := scalaVersions.head
 
-addCompilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
+ThisBuild / libraryDependencies +=
+  compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 
 val scala212options = Seq(
   "-deprecation",
