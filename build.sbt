@@ -1,3 +1,5 @@
+Global / useSuperShell := false
+
 val scalaVersions = List("2.13.1", "2.12.10")
 
 ThisBuild / version := "0.0.5"
