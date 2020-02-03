@@ -3,6 +3,7 @@ package jetty4s.client
 import java.net.URI
 import java.util.concurrent.{ Executor, TimeUnit }
 
+import cats.Applicative
 import cats.effect._
 import cats.effect.implicits._
 import cats.implicits._
@@ -110,10 +111,19 @@ object JettyClientBuilder {
         .content(h)
       _ = for (h <- r.headers) req.header(h.name.toString, h.value): Unit
       _ <- Resource.make(h.write(r.body).start)(_.cancel)
-      _ <- Resource.make(Sync[F].delay(req.send(h)))(
-        _ => Sync[F].delay(req.abort(InterruptedRequestException): Unit)
-      )
-      res <- Resource.liftF[F, Response[F]](h.response)
+      res <- {
+        def abort(t: Throwable): F[Unit] = Sync[F].delay(req.abort(t): Unit)
+
+        val interrupt = abort(InterruptedRequestException)
+        val acquire: F[Response[F]] = Sync[F].delay(req.send(h)) >> h.response
+        val release: (Response[F], ExitCase[Throwable]) => F[Unit] = {
+          case (_, ExitCase.Completed) => Applicative[F].unit
+          case (_, ExitCase.Canceled) => interrupt
+          case (_, ExitCase.Error(t)) => abort(t)
+        }
+
+        Resource.makeCase(acquire)(release)
+      }
     } yield res
   }
 }

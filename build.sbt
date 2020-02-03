@@ -63,7 +63,10 @@ lazy val client = (project in file("client"))
     name := "jetty4s-client",
     libraryDependencies ++= Seq(
       "org.http4s" %% "http4s-client" % http4sVersion,
-      "org.eclipse.jetty" % "jetty-client" % jettyVersion
+      "org.eclipse.jetty" % "jetty-client" % jettyVersion,
+
+      "org.http4s" %% "http4s-blaze-server" % http4sVersion % Test,
+      "org.scalatest" %% "scalatest" % "3.0.8" % Test
     )
   )
 
