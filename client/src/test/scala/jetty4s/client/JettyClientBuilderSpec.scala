@@ -1,14 +1,16 @@
 package jetty4s.client
 
-import fs2._
 import cats.effect.{ ContextShift, IO, Timer }
+import fs2._
+import org.http4s._
 import org.http4s.server.blaze.BlazeServerBuilder
-import org.http4s.{ HttpApp, Method, Request, Response, Uri }
-import org.scalatest.{ BeforeAndAfterAll, FlatSpec, Matchers }
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.ExecutionContext
 
-class JettyClientBuilderSpec extends FlatSpec with Matchers with BeforeAndAfterAll {
+class JettyClientBuilderSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll {
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
