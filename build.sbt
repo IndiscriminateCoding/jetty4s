@@ -2,7 +2,7 @@ Global / useSuperShell := false
 
 val scalaVersions = List("2.13.1", "2.12.10")
 
-ThisBuild / version := "0.0.5"
+ThisBuild / version := "0.0.6"
 ThisBuild / organization := "com.github.IndiscriminateCoding"
 ThisBuild / scalaVersion := scalaVersions.head
 
