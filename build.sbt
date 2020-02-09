@@ -2,7 +2,7 @@ Global / useSuperShell := false
 
 val scalaVersions = List("2.13.1", "2.12.10")
 
-ThisBuild / version := "0.0.6"
+ThisBuild / version := "0.0.7"
 ThisBuild / organization := "com.github.IndiscriminateCoding"
 ThisBuild / scalaVersion := scalaVersions.head
 
@@ -43,7 +43,7 @@ val scala213options = Seq(
   "-Ywarn-value-discard"
 )
 
-val http4sVersion = "0.21.0-RC4"
+val http4sVersion = "0.21.0"
 val jettyVersion = "9.4.26.v20200117"
 
 lazy val jetty4s = (project in file("."))
