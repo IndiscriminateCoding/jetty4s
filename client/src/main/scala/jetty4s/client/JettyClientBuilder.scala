@@ -99,16 +99,18 @@ object JettyClientBuilder {
   private def fromHttpClient[F[_] : ConcurrentEffect](c: HttpClient): Client[F] = Client { r =>
     for {
       h <- Resource.liftF[F, StreamHandler[F]](StreamHandler[F])
-      req = c
-        .newRequest(r.uri.toString)
-        .method(r.method.name)
-        .version(r.httpVersion match {
-          case HttpVersion.`HTTP/1.0` => JHttpVersion.HTTP_1_0
-          case HttpVersion.`HTTP/1.1` => JHttpVersion.HTTP_1_1
-          case HttpVersion.`HTTP/2.0` => JHttpVersion.HTTP_2
-          case _ => JHttpVersion.HTTP_1_1
-        })
-        .content(h)
+      req <- Resource.liftF(Sync[F].delay {
+        c
+          .newRequest(r.uri.toString)
+          .method(r.method.name)
+          .version(r.httpVersion match {
+            case HttpVersion.`HTTP/1.0` => JHttpVersion.HTTP_1_0
+            case HttpVersion.`HTTP/1.1` => JHttpVersion.HTTP_1_1
+            case HttpVersion.`HTTP/2.0` => JHttpVersion.HTTP_2
+            case _ => JHttpVersion.HTTP_1_1
+          })
+          .content(h)
+      })
       _ = for (h <- r.headers) req.header(h.name.toString, h.value): Unit
       _ <- Resource.make(h.write(r.body).start)(_.cancel)
       res <- {
