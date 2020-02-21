@@ -66,7 +66,7 @@ lazy val client = (project in file("client"))
       "org.eclipse.jetty" % "jetty-client" % jettyVersion,
 
       "org.http4s" %% "http4s-blaze-server" % http4sVersion % Test,
-      "org.scalatest" %% "scalatest" % "3.1.0" % Test
+      "org.scalatest" %% "scalatest" % "3.1.1" % Test
     )
   )
 
