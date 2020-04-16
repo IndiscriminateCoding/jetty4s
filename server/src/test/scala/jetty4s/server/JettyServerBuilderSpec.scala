@@ -14,6 +14,8 @@ class JettyServerBuilderSpec extends AnyFlatSpec with Matchers {
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
+  private val port = 11118
+
   private val sizes = List(1, 2, 178, 1023, 1024, 1025, 16000)
   private val bodyStream: List[Stream[Pure, Byte]] = for {
     a <- sizes
@@ -35,6 +37,7 @@ class JettyServerBuilderSpec extends AnyFlatSpec with Matchers {
 
   JettyServerBuilder[IO]
     .withHttpResource(app)
+    .bindHttp(port = port)
     .resource
     .allocated
     .unsafeRunSync()
@@ -49,7 +52,7 @@ class JettyServerBuilderSpec extends AnyFlatSpec with Matchers {
             headers = Headers.of(Header("transfer-encoding", "chunked"))
           ).withUri(
             Uri(
-              authority = Some(Uri.Authority(host = Uri.RegName("localhost"), port = Some(8080))),
+              authority = Some(Uri.Authority(host = Uri.RegName("localhost"), port = Some(port))),
               scheme = Some(Scheme.http)
             )
           )
