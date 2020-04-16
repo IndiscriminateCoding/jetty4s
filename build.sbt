@@ -1,4 +1,5 @@
 Global / useSuperShell := false
+Global / onChangedBuildSource := ReloadOnSourceChanges
 
 val scalaVersions = List("2.13.1", "2.12.10")
 
@@ -92,8 +93,12 @@ lazy val server = (project in file("server"))
     },
     name := "jetty4s-server",
     libraryDependencies ++= Seq(
-      "org.http4s" %% "http4s-core" % http4sVersion,
+      "org.http4s" %% "http4s-server" % http4sVersion,
+      "org.eclipse.jetty" % "jetty-server" % jettyVersion,
+      "org.eclipse.jetty" % "jetty-alpn-server" % jettyVersion,
+      "org.eclipse.jetty.http2" % "http2-server" % jettyVersion,
 
+      "ch.qos.logback" % "logback-classic" % "1.2.3" % Test,
       "org.scalatest" %% "scalatest" % scalatestVersion % Test
     )
   )
