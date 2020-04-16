@@ -11,6 +11,7 @@ import fs2.Chunk.Bytes
 import fs2.concurrent.Queue
 import fs2.{ Pull, Stream }
 import jetty4s.client.StreamHandler._
+import jetty4s.common.RepeatedReadException
 import org.eclipse.jetty.client.api.Response._
 import org.eclipse.jetty.client.api.{ Result, Response => JResponse }
 import org.eclipse.jetty.client.util.DeferredContentProvider

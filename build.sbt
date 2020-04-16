@@ -45,12 +45,24 @@ val scala213options = Seq(
 
 val http4sVersion = "0.21.3"
 val jettyVersion = "9.4.28.v20200408"
+val scalatestVersion = "3.1.1"
 
 lazy val jetty4s = (project in file("."))
-  .aggregate(client)
+  .aggregate(common, client, server)
   .settings(
     publish / skip := true,
     crossScalaVersions := Nil
+  )
+
+lazy val common = (project in file("common"))
+  .settings(
+    crossScalaVersions := scalaVersions,
+    scalacOptions := {
+      if (scalaVersion.value.startsWith("2.12.")) scala212options
+      else scala213options
+    },
+    name := "jetty4s-common",
+    libraryDependencies += "org.http4s" %% "http4s-core" % http4sVersion
   )
 
 lazy val client = (project in file("client"))
@@ -66,9 +78,26 @@ lazy val client = (project in file("client"))
       "org.eclipse.jetty" % "jetty-client" % jettyVersion,
 
       "org.http4s" %% "http4s-blaze-server" % http4sVersion % Test,
-      "org.scalatest" %% "scalatest" % "3.1.1" % Test
+      "org.scalatest" %% "scalatest" % scalatestVersion % Test
     )
   )
+  .dependsOn(common)
+
+lazy val server = (project in file("server"))
+  .settings(
+    crossScalaVersions := scalaVersions,
+    scalacOptions := {
+      if (scalaVersion.value.startsWith("2.12.")) scala212options
+      else scala213options
+    },
+    name := "jetty4s-server",
+    libraryDependencies ++= Seq(
+      "org.http4s" %% "http4s-core" % http4sVersion,
+
+      "org.scalatest" %% "scalatest" % scalatestVersion % Test
+    )
+  )
+  .dependsOn(common, client % "test")
 
 // sonatype-related settings
 ThisBuild / publishTo := sonatypePublishTo.value

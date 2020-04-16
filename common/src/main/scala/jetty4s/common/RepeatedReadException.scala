@@ -1,4 +1,4 @@
-package jetty4s.client
+package jetty4s.common
 
 import org.http4s._
 
