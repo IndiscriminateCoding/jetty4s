@@ -14,8 +14,8 @@ class JettyServerBuilderSpec extends AnyFlatSpec with Matchers {
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
-  private val sizes = LazyList(1, 2, 178, 1023, 1024, 1025, 16000)
-  private val bodyStream: LazyList[Stream[Pure, Byte]] = for {
+  private val sizes = List(1, 2, 178, 1023, 1024, 1025, 16000)
+  private val bodyStream: List[Stream[Pure, Byte]] = for {
     a <- sizes
     b <- sizes
     c <- sizes

@@ -62,7 +62,7 @@ private[server] class HttpResourceHandler[F[_]: ConcurrentEffect](
                     val res = Bytes(buf)
                     buf = newBuf()
                     res
-                  } else Bytes(Array.copyOf(buf, len))
+                  } else Bytes(java.util.Arrays.copyOf(buf, len))
                 store.enqueue1(bytes) >> {
                   if (in.isReady) loop
                   else Applicative[F].unit
@@ -72,7 +72,7 @@ private[server] class HttpResourceHandler[F[_]: ConcurrentEffect](
           unsafeFork(loop, "read/loop")
         }
 
-        def onAllDataRead(): Unit = unsafeFork(store enqueue1 (), "request/enqueue")
+        def onAllDataRead(): Unit = unsafeFork(store.enqueue1(()), "request/enqueue")
 
         def onError(t: Throwable): Unit = unsafeFork(store enqueue1 t, "request/enqueue")
       })
@@ -132,7 +132,7 @@ private[server] class HttpResourceHandler[F[_]: ConcurrentEffect](
               Sync[F].raiseError(err)
             case c => store.enqueue1(c)
           }
-          .onFinalizeWeak(store enqueue1 ())
+          .onFinalizeWeak(store.enqueue1(()))
     }
 
     val request = fromHttpServletRequest(req, if (requestIsEmpty) EmptyBody else requestBody)
