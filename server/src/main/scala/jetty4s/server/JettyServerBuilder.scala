@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 
 import cats.effect.{ ConcurrentEffect, Resource, Sync }
+import javax.net.ssl.{ SSLContext, SSLParameters }
 import jetty4s.common.SSLKeyStore
 import jetty4s.common.SSLKeyStore.{ FileKeyStore, JavaKeyStore }
 import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory
@@ -12,37 +13,55 @@ import org.eclipse.jetty.http2.server._
 import org.eclipse.jetty.server.handler.ErrorHandler
 import org.eclipse.jetty.server.{ HttpConfiguration, HttpConnectionFactory, SslConnectionFactory }
 import org.eclipse.jetty.util.ssl.SslContextFactory
+import org.eclipse.jetty.util.thread.ThreadPool
 import org.eclipse.jetty.{ server => jetty }
-import org.http4s.server.{ Server, defaults }
+import org.http4s.server.{ SSLClientAuthMode, Server, defaults }
 import org.http4s.{ HttpApp, Request, Response }
+
+import scala.concurrent.duration.FiniteDuration
 
 class JettyServerBuilder[F[_]] private(
   http: Option[InetSocketAddress] = None,
   https: Option[InetSocketAddress] = None,
+  threadPool: Option[ThreadPool] = None,
+  idleTimeout: Option[FiniteDuration] = None,
   keyStore: Option[SSLKeyStore] = None,
   keyStoreType: Option[String] = None,
   trustStore: Option[SSLKeyStore] = None,
   trustStoreType: Option[String] = None,
   sniRequired: Boolean = true,
+  sslContext: Option[SSLContext] = None,
+  sslParameters: Option[SSLParameters] = None,
+  clientAuth: SSLClientAuthMode = SSLClientAuthMode.NotRequested,
   handler: Option[jetty.Handler] = None
 )(implicit protected val F: ConcurrentEffect[F]) {
   private[this] def copy(
     http: Option[InetSocketAddress] = http,
     https: Option[InetSocketAddress] = https,
+    threadPool: Option[ThreadPool] = threadPool,
+    idleTimeout: Option[FiniteDuration] = idleTimeout,
     keyStore: Option[SSLKeyStore] = keyStore,
     keyStoreType: Option[String] = keyStoreType,
     trustStore: Option[SSLKeyStore] = trustStore,
     trustStoreType: Option[String] = trustStoreType,
     sniRequired: Boolean = sniRequired,
+    sslContext: Option[SSLContext] = sslContext,
+    sslParameters: Option[SSLParameters] = sslParameters,
+    clientAuth: SSLClientAuthMode = clientAuth,
     handler: Option[jetty.Handler] = handler
   ): JettyServerBuilder[F] = new JettyServerBuilder[F](
     http = http,
     https = https,
+    threadPool = threadPool,
+    idleTimeout = idleTimeout,
     keyStore = keyStore,
     keyStoreType = keyStoreType,
     trustStore = trustStore,
     trustStoreType = trustStoreType,
     sniRequired = sniRequired,
+    sslContext = sslContext,
+    sslParameters = sslParameters,
+    clientAuth = clientAuth,
     handler = handler
   )
 
@@ -55,6 +74,12 @@ class JettyServerBuilder[F[_]] private(
     Resource.liftF(http.run(req))
   }
 
+  def withThreadPool(threadPool: ThreadPool): JettyServerBuilder[F] =
+    copy(threadPool = Some(threadPool))
+
+  def withIdleTimeout(idleTimeout: FiniteDuration): JettyServerBuilder[F] =
+    copy(idleTimeout = Some(idleTimeout))
+
   def withKeyStore(keyStore: SSLKeyStore): JettyServerBuilder[F] = copy(keyStore = Some(keyStore))
 
   def withKeyStoreType(keyStoreType: String): JettyServerBuilder[F] =
@@ -65,6 +90,18 @@ class JettyServerBuilder[F[_]] private(
 
   def withTrustStoreType(trustStoreType: String): JettyServerBuilder[F] =
     copy(trustStoreType = Some(trustStoreType))
+
+  def withSniRequired(sniRequired: Boolean): JettyServerBuilder[F] =
+    copy(sniRequired = sniRequired)
+
+  def withSslContext(sslContext: SSLContext): JettyServerBuilder[F] =
+    copy(sslContext = Some(sslContext))
+
+  def withSslParameters(sslParameters: SSLParameters): JettyServerBuilder[F] =
+    copy(sslParameters = Some(sslParameters))
+
+  def withClientAuth(clientAuth: SSLClientAuthMode): JettyServerBuilder[F] =
+    copy(clientAuth = clientAuth)
 
   def bindSocketAddress(socketAddress: InetSocketAddress): JettyServerBuilder[F] =
     copy(http = Some(socketAddress))
@@ -80,7 +117,7 @@ class JettyServerBuilder[F[_]] private(
 
   def resource: Resource[F, List[Server[F]]] = {
     val acquire: F[jetty.Server] = Sync[F].delay {
-      val s = new jetty.Server()
+      val s = threadPool.fold(new jetty.Server())(new jetty.Server(_))
 
       def httpConnector(socket: InetSocketAddress) = {
         val conf = new HttpConfiguration
@@ -88,6 +125,7 @@ class JettyServerBuilder[F[_]] private(
         val h2c = new HTTP2CServerConnectionFactory(conf)
         val conn = new jetty.ServerConnector(s, h1, h2c)
 
+        idleTimeout.foreach(t => conn.setIdleTimeout(t.toMillis))
         conn.setPort(socket.getPort)
         conn.setHost(socket.getHostName)
         conn
@@ -105,6 +143,16 @@ class JettyServerBuilder[F[_]] private(
         val cf = new SslContextFactory.Server
 
         cf.setSniRequired(sniRequired)
+        sslContext.foreach(cf.setSslContext)
+        sslParameters.foreach(cf.customize)
+        clientAuth match {
+          case SSLClientAuthMode.NotRequested => ()
+          case SSLClientAuthMode.Requested =>
+            cf.setWantClientAuth(true)
+          case SSLClientAuthMode.Required =>
+            cf.setWantClientAuth(true)
+            cf.setNeedClientAuth(true)
+        }
         ks match {
           case FileKeyStore(path, password) =>
             cf.setKeyStorePath(path)
@@ -127,6 +175,7 @@ class JettyServerBuilder[F[_]] private(
         val ssl = new SslConnectionFactory(cf, alpn.getProtocol)
         val conn = new jetty.ServerConnector(s, ssl, alpn, h2, h1)
 
+        idleTimeout.foreach(t => conn.setIdleTimeout(t.toMillis))
         conn.setPort(socket.getPort)
         conn.setHost(socket.getHostName)
         conn
