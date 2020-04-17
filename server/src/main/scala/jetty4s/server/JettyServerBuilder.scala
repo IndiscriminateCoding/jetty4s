@@ -13,7 +13,7 @@ import org.eclipse.jetty.server.handler.ErrorHandler
 import org.eclipse.jetty.server.{ HttpConfiguration, HttpConnectionFactory, SslConnectionFactory }
 import org.eclipse.jetty.util.ssl.SslContextFactory
 import org.eclipse.jetty.{ server => jetty }
-import org.http4s.server.defaults
+import org.http4s.server.{ Server, defaults }
 import org.http4s.{ HttpApp, Request, Response }
 
 class JettyServerBuilder[F[_]] private(
@@ -78,7 +78,7 @@ class JettyServerBuilder[F[_]] private(
   def bindHttps(port: Int = 8443, host: String = "0.0.0.0"): JettyServerBuilder[F] =
     bindSecureSocketAddress(InetSocketAddress.createUnresolved(host, port))
 
-  def resource: Resource[F, Unit] = {
+  def resource: Resource[F, List[Server[F]]] = {
     val acquire: F[jetty.Server] = Sync[F].delay {
       val s = new jetty.Server()
 
@@ -152,8 +152,27 @@ class JettyServerBuilder[F[_]] private(
 
     def release(s: jetty.Server): F[Unit] = Sync[F].delay(s.stop())
 
-    Resource.make[F, jetty.Server](acquire)(release).map(_ => ())
+    Resource.make[F, jetty.Server](acquire)(release).map { _ =>
+      def insecure(s: InetSocketAddress) = new Server[F] {
+        def address: InetSocketAddress = defaults.SocketAddress
+
+        def isSecure: Boolean = false
+      }
+
+      def secure(s: InetSocketAddress) = new Server[F] {
+        def address: InetSocketAddress = defaults.SocketAddress
+
+        def isSecure: Boolean = true
+      }
+
+      (http, https) match {
+        case (None, None) => insecure(defaults.SocketAddress) :: Nil
+        case _ => http.map(insecure).toList ++ https.map(secure).toList
+      }
+    }
   }
+
+  def allocated: F[(List[Server[F]], F[Unit])] = resource.allocated
 }
 
 object JettyServerBuilder {

@@ -23,7 +23,7 @@ val clientResource: Resource[IO, Client[IO]] = JettyClientBuilder[IO]
 And `jetty4s.server.JettyServerBuilder` to run your `HttpApp[F]`:
 
 ```scala
-val serverResource: Resource[IO, Unit] = JettyServerBuilder[IO]
+val serverResource: Resource[IO, List[Server[IO]]] = JettyServerBuilder[IO]
   .withHttpApp(app)
   .resource
 ```
