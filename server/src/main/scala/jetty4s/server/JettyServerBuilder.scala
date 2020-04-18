@@ -3,7 +3,7 @@ package jetty4s.server
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 
-import cats.effect.{ ConcurrentEffect, Resource, Sync }
+import cats.effect._
 import javax.net.ssl.{ SSLContext, SSLParameters }
 import jetty4s.common.SSLKeyStore
 import jetty4s.common.SSLKeyStore.{ FileKeyStore, JavaKeyStore }
@@ -12,6 +12,8 @@ import org.eclipse.jetty.http.HttpFields
 import org.eclipse.jetty.http2.server._
 import org.eclipse.jetty.server.handler.ErrorHandler
 import org.eclipse.jetty.server.{ HttpConfiguration, HttpConnectionFactory, SslConnectionFactory }
+import org.eclipse.jetty.util.component.AbstractLifeCycle.AbstractLifeCycleListener
+import org.eclipse.jetty.util.component.LifeCycle
 import org.eclipse.jetty.util.ssl.SslContextFactory
 import org.eclipse.jetty.util.thread.ThreadPool
 import org.eclipse.jetty.{ server => jetty }
@@ -199,7 +201,14 @@ class JettyServerBuilder[F[_]] private(
       s
     }
 
-    def release(s: jetty.Server): F[Unit] = Sync[F].delay(s.stop())
+    def release(s: jetty.Server): F[Unit] = Async[F].async { cb =>
+      s.addLifeCycleListener(new AbstractLifeCycleListener {
+        override def lifeCycleStopped(lc: LifeCycle): Unit = cb(Right(()))
+
+        override def lifeCycleFailure(lc: LifeCycle, t: Throwable): Unit = cb(Left(t))
+      })
+      s.stop()
+    }
 
     Resource.make[F, jetty.Server](acquire)(release).map { _ =>
       def insecure(s: InetSocketAddress) = new Server[F] {
