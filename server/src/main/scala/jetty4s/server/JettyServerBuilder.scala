@@ -22,7 +22,7 @@ import org.http4s.{ HttpApp, Request, Response }
 
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
-class JettyServerBuilder[F[_]] private(
+class JettyServerBuilder[F[_]: ConcurrentEffect] private(
   http: Option[InetSocketAddress] = None,
   https: Option[InetSocketAddress] = None,
   threadPool: Option[ThreadPool] = None,
@@ -37,7 +37,7 @@ class JettyServerBuilder[F[_]] private(
   sslParameters: Option[SSLParameters] = None,
   clientAuth: SSLClientAuthMode = SSLClientAuthMode.NotRequested,
   handler: Option[jetty.Handler] = None
-)(implicit protected val F: ConcurrentEffect[F]) {
+) {
   private[this] def copy(
     http: Option[InetSocketAddress] = http,
     https: Option[InetSocketAddress] = https,
