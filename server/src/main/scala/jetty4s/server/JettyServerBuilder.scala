@@ -20,12 +20,13 @@ import org.eclipse.jetty.{ server => jetty }
 import org.http4s.server.{ SSLClientAuthMode, Server, defaults }
 import org.http4s.{ HttpApp, Request, Response }
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{ Duration, FiniteDuration }
 
 class JettyServerBuilder[F[_]] private(
   http: Option[InetSocketAddress] = None,
   https: Option[InetSocketAddress] = None,
   threadPool: Option[ThreadPool] = None,
+  asyncTimeout: Duration = Duration.Inf,
   idleTimeout: Option[FiniteDuration] = None,
   keyStore: Option[SSLKeyStore] = None,
   keyStoreType: Option[String] = None,
@@ -41,6 +42,7 @@ class JettyServerBuilder[F[_]] private(
     http: Option[InetSocketAddress] = http,
     https: Option[InetSocketAddress] = https,
     threadPool: Option[ThreadPool] = threadPool,
+    asyncTimeout: Duration = asyncTimeout,
     idleTimeout: Option[FiniteDuration] = idleTimeout,
     keyStore: Option[SSLKeyStore] = keyStore,
     keyStoreType: Option[String] = keyStoreType,
@@ -55,6 +57,7 @@ class JettyServerBuilder[F[_]] private(
     http = http,
     https = https,
     threadPool = threadPool,
+    asyncTimeout = asyncTimeout,
     idleTimeout = idleTimeout,
     keyStore = keyStore,
     keyStoreType = keyStoreType,
@@ -70,7 +73,10 @@ class JettyServerBuilder[F[_]] private(
   def withHandler(handler: jetty.Handler): JettyServerBuilder[F] = copy(handler = Some(handler))
 
   def withHttpResource(http: Request[F] => Resource[F, Response[F]]): JettyServerBuilder[F] =
-    withHandler(new HttpResourceHandler[F](http))
+    withHandler(new HttpResourceHandler[F](
+      http,
+      if (asyncTimeout.isFinite) asyncTimeout.toMillis else 0L
+    ))
 
   def withHttpApp(http: HttpApp[F]): JettyServerBuilder[F] = withHttpResource { req =>
     Resource.liftF(http.run(req))
@@ -78,6 +84,9 @@ class JettyServerBuilder[F[_]] private(
 
   def withThreadPool(threadPool: ThreadPool): JettyServerBuilder[F] =
     copy(threadPool = Some(threadPool))
+
+  def withAsyncTimeout(asyncTimeout: Duration): JettyServerBuilder[F] =
+    copy(asyncTimeout = asyncTimeout)
 
   def withIdleTimeout(idleTimeout: FiniteDuration): JettyServerBuilder[F] =
     copy(idleTimeout = Some(idleTimeout))

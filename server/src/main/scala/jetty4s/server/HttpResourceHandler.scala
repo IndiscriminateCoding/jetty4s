@@ -20,6 +20,7 @@ import scala.collection.JavaConverters._
 
 private[server] class HttpResourceHandler[F[_]: ConcurrentEffect](
   app: Request[F] => Resource[F, Response[F]],
+  asyncTimeout: Long,
   chunkSize: Int = 1024,
   queueSizeBounds: Int = 4
 ) extends AbstractHandler {
@@ -41,7 +42,7 @@ private[server] class HttpResourceHandler[F[_]: ConcurrentEffect](
     val requestIsEmpty = "0" == req.getHeader("content-length")
     var autoFlush: Boolean = false
     val ctx = req.startAsync()
-    ctx.setTimeout(0L)
+    ctx.setTimeout(asyncTimeout)
 
     def requestBody: Stream[F, Byte] = {
       def newBuf() = new Array[Byte](chunkSize)

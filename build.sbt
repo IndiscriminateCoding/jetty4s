@@ -3,7 +3,7 @@ Global / onChangedBuildSource := ReloadOnSourceChanges
 
 val scalaVersions = List("2.13.1", "2.12.10")
 
-ThisBuild / version := "0.0.8"
+ThisBuild / version := "0.0.9"
 ThisBuild / organization := "com.github.IndiscriminateCoding"
 ThisBuild / scalaVersion := scalaVersions.head
 
