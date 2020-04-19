@@ -3,129 +3,159 @@ package jetty4s.client
 import java.net.URI
 import java.util.concurrent.{ Executor, TimeUnit }
 
-import cats.Applicative
 import cats.effect._
-import cats.effect.implicits._
-import cats.implicits._
-import jetty4s.client.JettyClientBuilder._
+import fs2._
+import javax.net.ssl.{ SSLContext, SSLParameters }
+import jetty4s.common.SSLKeyStore
+import jetty4s.common.SSLKeyStore._
 import org.eclipse.jetty.client.{ HttpClient, HttpConversation, HttpRequest }
-import org.eclipse.jetty.http.{ HttpVersion => JHttpVersion }
+import org.eclipse.jetty.util.component.AbstractLifeCycle.AbstractLifeCycleListener
+import org.eclipse.jetty.util.component.LifeCycle
 import org.eclipse.jetty.util.ssl.SslContextFactory
-import org.http4s._
 import org.http4s.client.Client
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
 final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
-  f: HttpClient => Unit = _ => (),
-  cf: Option[() => SslContextFactory] = Some(() => new SslContextFactory.Client()),
-  rt: Long = defaultRequestTimeoutMs
+  requestTimeout: Duration = 15.seconds,
+  idleTimeout: FiniteDuration = 60.seconds,
+  connectTimeout: FiniteDuration = 5.seconds,
+  maxConnections: Int = 64,
+  maxRequestsQueued: Int = 128,
+  executor: Option[Executor] = None,
+  keyStore: Option[SSLKeyStore] = None,
+  keyStoreType: Option[String] = None,
+  trustStore: Option[SSLKeyStore] = None,
+  trustStoreType: Option[String] = None,
+  sslContext: Option[SSLContext] = None,
+  sslParameters: Option[SSLParameters] = None
 ) {
-  private[this] def copy(
-    f: HttpClient => Unit = f,
-    cf: Option[() => SslContextFactory] = cf,
-    rt: Long = rt
-  ): JettyClientBuilder[F] = new JettyClientBuilder[F](f, cf, rt)
+  def copy(
+    requestTimeout: Duration = requestTimeout,
+    idleTimeout: FiniteDuration = idleTimeout,
+    connectTimeout: FiniteDuration = connectTimeout,
+    maxConnections: Int = maxConnections,
+    maxRequestsQueued: Int = maxRequestsQueued,
+    executor: Option[Executor] = executor,
+    keyStore: Option[SSLKeyStore] = keyStore,
+    keyStoreType: Option[String] = keyStoreType,
+    trustStore: Option[SSLKeyStore] = trustStore,
+    trustStoreType: Option[String] = trustStoreType,
+    sslContext: Option[SSLContext] = sslContext,
+    sslParameters: Option[SSLParameters] = sslParameters
+  ): JettyClientBuilder[F] = new JettyClientBuilder[F](
+    requestTimeout = requestTimeout,
+    idleTimeout = idleTimeout,
+    connectTimeout = connectTimeout,
+    maxConnections = maxConnections,
+    maxRequestsQueued = maxRequestsQueued,
+    executor = executor,
+    keyStore = keyStore,
+    keyStoreType = keyStoreType,
+    trustStore = trustStore,
+    trustStoreType = trustStoreType,
+    sslContext = sslContext,
+    sslParameters = sslParameters
+  )
 
-  def resource: Resource[F, Client[F]] = Resource
-    .make(Sync[F].delay {
-      val c = new HttpClient(cf.map(_ ()).orNull) {
-        override def newHttpRequest(c: HttpConversation, u: URI): HttpRequest = {
-          val r = super.newHttpRequest(c, u)
-          r.timeout(rt, TimeUnit.MILLISECONDS)
-          r
-        }
+  def withKeyStore(keyStore: SSLKeyStore): JettyClientBuilder[F] = copy(keyStore = Some(keyStore))
+
+  def withKeyStoreType(keyStoreType: String): JettyClientBuilder[F] =
+    copy(keyStoreType = Some(keyStoreType))
+
+  def withTrustStore(trustStore: SSLKeyStore): JettyClientBuilder[F] =
+    copy(trustStore = Some(trustStore))
+
+  def withTrustStoreType(trustStoreType: String): JettyClientBuilder[F] =
+    copy(trustStoreType = Some(trustStoreType))
+
+  def withSslContext(sslContext: SSLContext): JettyClientBuilder[F] =
+    copy(sslContext = Some(sslContext))
+
+  def withSslParameters(sslParameters: SSLParameters): JettyClientBuilder[F] =
+    copy(sslParameters = Some(sslParameters))
+
+  def withRequestTimeout(requestTimeout: Duration): JettyClientBuilder[F] =
+    copy(requestTimeout = requestTimeout)
+
+  def withExecutor(executor: Executor): JettyClientBuilder[F] =
+    copy(executor = Some(executor))
+
+  def withIdleTimeout(idleTimeout: FiniteDuration): JettyClientBuilder[F] =
+    copy(idleTimeout = idleTimeout)
+
+  def withConnectTimeout(connectTimeout: FiniteDuration): JettyClientBuilder[F] =
+    copy(connectTimeout = connectTimeout)
+
+  def withMaxConnections(maxConnections: Int): JettyClientBuilder[F] =
+    copy(maxConnections = maxConnections)
+
+  def withMaxRequestsQueued(maxRequestsQueued: Int): JettyClientBuilder[F] =
+    copy(maxRequestsQueued = maxRequestsQueued)
+
+  def resource: Resource[F, Client[F]] = {
+    val acquire = Sync[F].delay {
+      val cf = new SslContextFactory.Client
+      sslContext.foreach(cf.setSslContext)
+      sslParameters.foreach(cf.customize)
+      keyStore foreach {
+        case FileKeyStore(path, password) =>
+          cf.setKeyStorePath(path)
+          cf.setKeyStorePassword(password)
+        case JavaKeyStore(jks, password) =>
+          cf.setKeyStore(jks)
+          cf.setKeyStorePassword(password)
       }
+      keyStoreType.foreach(cf.setKeyStoreType)
+      trustStore foreach {
+        case FileKeyStore(path, password) =>
+          cf.setTrustStorePath(path)
+          cf.setTrustStorePassword(password)
+        case JavaKeyStore(jks, password) =>
+          cf.setTrustStore(jks)
+          cf.setTrustStorePassword(password)
+      }
+      trustStoreType.foreach(cf.setTrustStoreType)
 
-      f(c)
+      val c =
+        if (requestTimeout.isFinite) {
+          new HttpClient(cf) {
+            override def newHttpRequest(c: HttpConversation, u: URI): HttpRequest = {
+              val r = super.newHttpRequest(c, u)
+              r.timeout(requestTimeout.toMillis, TimeUnit.MILLISECONDS)
+              r
+            }
+          }
+        } else new HttpClient(cf)
+
+      c.setIdleTimeout(idleTimeout.toMillis)
+      c.setConnectTimeout(connectTimeout.toMillis)
+      c.setMaxConnectionsPerDestination(maxConnections)
+      c.setMaxRequestsQueuedPerDestination(maxRequestsQueued)
+      executor.foreach(c.setExecutor)
       c.setFollowRedirects(false)
       c.setDefaultRequestContentType(null) // scalafix:ok
       c.start()
       c
-    })(c => Sync[F].delay(c.stop()))
-    .map(fromHttpClient[F])
+    }
+
+    def release(c: HttpClient): F[Unit] = Async[F].async { cb =>
+      c.addLifeCycleListener(new AbstractLifeCycleListener {
+        override def lifeCycleStopped(lc: LifeCycle): Unit = cb(Right(()))
+
+        override def lifeCycleFailure(lc: LifeCycle, t: Throwable): Unit = cb(Left(t))
+      })
+      c.stop()
+    }
+
+    Resource.make[F, HttpClient](acquire)(release).map(FromHttpClient[F])
+  }
 
   def allocated: F[(Client[F], F[Unit])] = resource.allocated
 
-  def stream: fs2.Stream[F, Client[F]] = fs2.Stream.resource(resource)
-
-  def withoutSslContextFactory: JettyClientBuilder[F] = copy(cf = None)
-
-  def withSslContextFactory(cf: => SslContextFactory): JettyClientBuilder[F] =
-    copy(cf = Some(() => cf))
-
-  def withRequestTimeout(timeout: FiniteDuration): JettyClientBuilder[F] =
-    copy(rt = timeout.toMillis)
-
-  def withExecutor(e: Executor): JettyClientBuilder[F] = copy(f = { c =>
-    f(c)
-    c.setExecutor(e)
-  })
-
-  def withIdleTimeout(timeout: FiniteDuration): JettyClientBuilder[F] = copy(f = { c =>
-    f(c)
-    c.setIdleTimeout(timeout.toMillis)
-  })
-
-  def withConnectTimeout(timeout: FiniteDuration): JettyClientBuilder[F] = copy(f = { c =>
-    f(c)
-    c.setConnectTimeout(timeout.toMillis)
-  })
-
-  def withMaxConnections(n: Int): JettyClientBuilder[F] = copy(f = { c =>
-    f(c)
-    c.setMaxConnectionsPerDestination(n)
-  })
-
-  def withMaxRequestsQueued(n: Int): JettyClientBuilder[F] = copy(f = { c =>
-    f(c)
-    c.setMaxRequestsQueuedPerDestination(n)
-  })
+  def stream: Stream[F, Client[F]] = Stream.resource(resource)
 }
 
 object JettyClientBuilder {
-  private val defaultRequestTimeoutMs = 15000L
-  private val defaultIdleTimeout = FiniteDuration(60, TimeUnit.SECONDS)
-  private val defaultConnectTimeout = FiniteDuration(5, TimeUnit.SECONDS)
-  private val defaultMaxConnections = 64
-  private val defaultMaxRequestsQueued = 128
-
   def apply[F[_] : ConcurrentEffect]: JettyClientBuilder[F] = new JettyClientBuilder()
-    .withIdleTimeout(defaultIdleTimeout)
-    .withConnectTimeout(defaultConnectTimeout)
-    .withMaxConnections(defaultMaxConnections)
-    .withMaxRequestsQueued(defaultMaxRequestsQueued)
-
-  private def fromHttpClient[F[_] : ConcurrentEffect](c: HttpClient): Client[F] = Client { r =>
-    for {
-      h <- Resource.liftF[F, StreamHandler[F]](StreamHandler[F])
-      req <- Resource.liftF(Sync[F].delay {
-        c
-          .newRequest(r.uri.toString)
-          .method(r.method.name)
-          .version(r.httpVersion match {
-            case HttpVersion.`HTTP/1.0` => JHttpVersion.HTTP_1_0
-            case HttpVersion.`HTTP/1.1` => JHttpVersion.HTTP_1_1
-            case HttpVersion.`HTTP/2.0` => JHttpVersion.HTTP_2
-            case _ => JHttpVersion.HTTP_1_1
-          })
-          .content(h)
-      })
-      _ = for (h <- r.headers) req.header(h.name.toString, h.value): Unit
-      _ <- Resource.make(h.write(r.body).start)(_.cancel)
-      res <- {
-        def abort(t: Throwable): F[Unit] = Sync[F].delay(req.abort(t): Unit)
-
-        val interrupt = abort(InterruptedRequestException)
-        val acquire: F[Response[F]] = Sync[F].delay(req.send(h)) >> h.response
-        val release: (Response[F], ExitCase[Throwable]) => F[Unit] = {
-          case (_, ExitCase.Completed) => Applicative[F].unit
-          case (_, ExitCase.Canceled) => interrupt
-          case (_, ExitCase.Error(t)) => abort(t)
-        }
-
-        Resource.makeCase(acquire)(release)
-      }
-    } yield res
-  }
 }

@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 
 import cats.effect._
+import fs2._
 import javax.net.ssl.{ SSLContext, SSLParameters }
 import jetty4s.common.SSLKeyStore
 import jetty4s.common.SSLKeyStore.{ FileKeyStore, JavaKeyStore }
@@ -22,7 +23,7 @@ import org.http4s.{ HttpApp, Request, Response }
 
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 
-class JettyServerBuilder[F[_]: ConcurrentEffect] private(
+final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
   http: Option[InetSocketAddress] = None,
   https: Option[InetSocketAddress] = None,
   threadPool: Option[ThreadPool] = None,
@@ -240,6 +241,8 @@ class JettyServerBuilder[F[_]: ConcurrentEffect] private(
   }
 
   def allocated: F[(List[Server[F]], F[Unit])] = resource.allocated
+
+  def stream: Stream[F, List[Server[F]]] = Stream.resource(resource)
 }
 
 object JettyServerBuilder {
