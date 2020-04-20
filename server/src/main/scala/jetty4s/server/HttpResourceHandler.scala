@@ -44,7 +44,7 @@ private[server] class HttpResourceHandler[F[_]: ConcurrentEffect](
     val ctx = req.startAsync()
     ctx.setTimeout(asyncTimeout)
 
-    def requestBody: Stream[F, Byte] = {
+    val requestBody: Stream[F, Byte] = Stream.suspend {
       def newBuf() = new Array[Byte](chunkSize)
 
       var buf = newBuf()
