@@ -30,7 +30,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
   sslContext: Option[SSLContext] = None,
   sslParameters: Option[SSLParameters] = None
 ) {
-  def copy(
+  private[this] def copy(
     requestTimeout: Duration = requestTimeout,
     idleTimeout: FiniteDuration = idleTimeout,
     connectTimeout: FiniteDuration = connectTimeout,
