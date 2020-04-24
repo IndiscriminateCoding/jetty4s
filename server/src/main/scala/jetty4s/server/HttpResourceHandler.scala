@@ -11,6 +11,8 @@ import javax.servlet.http.{ HttpServletRequest, HttpServletResponse }
 import javax.servlet.{ ReadListener, WriteListener }
 import jetty4s.common.RepeatedReadException
 import jetty4s.server.HttpResourceHandler._
+import org.eclipse.jetty.http.HttpScheme
+import org.eclipse.jetty.io.ssl.SslConnection
 import org.eclipse.jetty.server.handler.AbstractHandler
 import org.eclipse.jetty.{ server => jetty }
 import org.http4s._
@@ -43,6 +45,11 @@ private[server] class HttpResourceHandler[F[_]: ConcurrentEffect](
     var autoFlush: Boolean = false
     val ctx = req.startAsync()
     ctx.setTimeout(asyncTimeout)
+
+    baseReq.getHttpChannel.getEndPoint match {
+      case _: SslConnection#DecryptedEndPoint => baseReq.setScheme(HttpScheme.HTTPS.asString())
+      case _ => /* empty */
+    }
 
     val requestBody: Stream[F, Byte] = Stream.suspend {
       def newBuf() = new Array[Byte](chunkSize)
