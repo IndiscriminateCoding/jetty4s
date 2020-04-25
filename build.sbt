@@ -1,7 +1,7 @@
 Global / useSuperShell := false
 Global / onChangedBuildSource := ReloadOnSourceChanges
 
-val scalaVersions = List("2.13.1", "2.12.10")
+val scalaVersions = List("2.13.2", "2.12.10")
 
 ThisBuild / version := "0.0.9"
 ThisBuild / organization := "com.github.IndiscriminateCoding"
