@@ -22,6 +22,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
   connectTimeout: FiniteDuration = 5.seconds,
   maxConnections: Int = 64,
   maxRequestsQueued: Int = 128,
+  resolver: Option[Resolver[F]] = None,
   executor: Option[Executor] = None,
   keyStore: Option[SSLKeyStore] = None,
   keyStoreType: Option[String] = None,
@@ -36,6 +37,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
     connectTimeout: FiniteDuration = connectTimeout,
     maxConnections: Int = maxConnections,
     maxRequestsQueued: Int = maxRequestsQueued,
+    resolver: Option[Resolver[F]] = resolver,
     executor: Option[Executor] = executor,
     keyStore: Option[SSLKeyStore] = keyStore,
     keyStoreType: Option[String] = keyStoreType,
@@ -49,6 +51,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
     connectTimeout = connectTimeout,
     maxConnections = maxConnections,
     maxRequestsQueued = maxRequestsQueued,
+    resolver = resolver,
     executor = executor,
     keyStore = keyStore,
     keyStoreType = keyStoreType,
@@ -77,6 +80,9 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
 
   def withRequestTimeout(requestTimeout: Duration): JettyClientBuilder[F] =
     copy(requestTimeout = requestTimeout)
+
+  def withResolver(resolver: Resolver[F]): JettyClientBuilder[F] =
+    copy(resolver = Some(resolver))
 
   def withExecutor(executor: Executor): JettyClientBuilder[F] =
     copy(executor = Some(executor))
@@ -136,6 +142,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
       c.setConnectTimeout(connectTimeout.toMillis)
       c.setMaxConnectionsPerDestination(maxConnections)
       c.setMaxRequestsQueuedPerDestination(maxRequestsQueued)
+      resolver.foreach(r => c.setSocketAddressResolver(Resolver.asJetty(r)))
       executor.foreach(c.setExecutor)
       c.setFollowRedirects(false)
       c.setDefaultRequestContentType(null) // scalafix:ok

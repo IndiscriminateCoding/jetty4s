@@ -1,5 +1,7 @@
 package jetty4s.client
 
+import java.net.InetSocketAddress
+
 import cats.effect.{ ContextShift, IO, Timer }
 import fs2._
 import org.http4s._
@@ -24,7 +26,16 @@ class JettyClientBuilderSpec extends AnyFlatSpec with Matchers with BeforeAndAft
   override def afterAll(): Unit = stop.unsafeRunSync()
 
   it should "build proper client" in {
-    val client = JettyClientBuilder[IO].allocated.unsafeRunSync()._1
+    val client = JettyClientBuilder[IO]
+      .withResolver { (host: String, port: Int) =>
+        IO.delay {
+          host shouldBe "test-host"
+          List(new InetSocketAddress("127.0.0.1", port))
+        }
+      }
+      .allocated
+      .unsafeRunSync()
+      ._1
     val chunks = List("hello", " ", "world")
     val body = chunks.map(s => Stream.chunk(Chunk.bytes(s.getBytes))).reduce(_ ++ _)
     client
@@ -34,7 +45,7 @@ class JettyClientBuilderSpec extends AnyFlatSpec with Matchers with BeforeAndAft
           uri = Uri(
             scheme = Some(Uri.Scheme.http),
             authority = Some(
-              Uri.Authority(host = Uri.RegName("localhost"), port = Some(8080))
+              Uri.Authority(host = Uri.RegName("test-host"), port = Some(8080))
             )
           ),
           body = body
