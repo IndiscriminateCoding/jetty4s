@@ -6,7 +6,7 @@ import java.util
 import cats.effect.{ Effect, IO }
 import org.eclipse.jetty.util.{ Promise, SocketAddressResolver }
 
-import scala.jdk.CollectionConverters._
+import scala.collection.JavaConverters._
 
 trait Resolver[F[_]] {
   def resolve(host: String, port: Int): F[List[InetSocketAddress]]
