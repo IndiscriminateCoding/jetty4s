@@ -8,7 +8,7 @@ import fs2._
 import javax.net.ssl.{ SSLContext, SSLParameters }
 import jetty4s.common.SSLKeyStore
 import jetty4s.common.SSLKeyStore._
-import org.eclipse.jetty.client.{ HttpClient, HttpConversation, HttpRequest }
+import org.eclipse.jetty.client._
 import org.eclipse.jetty.util.component.AbstractLifeCycle.AbstractLifeCycleListener
 import org.eclipse.jetty.util.component.LifeCycle
 import org.eclipse.jetty.util.ssl.SslContextFactory
@@ -128,6 +128,10 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
           }
         } else new HttpClient(cf)
 
+      c.getTransport.setConnectionPoolFactory(dst =>
+        new RoundRobinConnectionPool(dst, maxConnections, dst)
+      )
+      c.getProtocolHandlers.clear()
       c.setIdleTimeout(idleTimeout.toMillis)
       c.setConnectTimeout(connectTimeout.toMillis)
       c.setMaxConnectionsPerDestination(maxConnections)
