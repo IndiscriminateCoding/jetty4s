@@ -27,9 +27,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
   keyStore: Option[SSLKeyStore] = None,
   keyStoreType: Option[String] = None,
   trustStore: Option[SSLKeyStore] = None,
-  trustStoreType: Option[String] = None,
-  sslContext: Option[SSLContext] = None,
-  sslParameters: Option[SSLParameters] = None
+  trustStoreType: Option[String] = None
 ) {
   private[this] def copy(
     requestTimeout: Duration = requestTimeout,
@@ -42,9 +40,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
     keyStore: Option[SSLKeyStore] = keyStore,
     keyStoreType: Option[String] = keyStoreType,
     trustStore: Option[SSLKeyStore] = trustStore,
-    trustStoreType: Option[String] = trustStoreType,
-    sslContext: Option[SSLContext] = sslContext,
-    sslParameters: Option[SSLParameters] = sslParameters
+    trustStoreType: Option[String] = trustStoreType
   ): JettyClientBuilder[F] = new JettyClientBuilder[F](
     requestTimeout = requestTimeout,
     idleTimeout = idleTimeout,
@@ -56,9 +52,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
     keyStore = keyStore,
     keyStoreType = keyStoreType,
     trustStore = trustStore,
-    trustStoreType = trustStoreType,
-    sslContext = sslContext,
-    sslParameters = sslParameters
+    trustStoreType = trustStoreType
   )
 
   def withKeyStore(keyStore: SSLKeyStore): JettyClientBuilder[F] = copy(keyStore = Some(keyStore))
@@ -71,12 +65,6 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
 
   def withTrustStoreType(trustStoreType: String): JettyClientBuilder[F] =
     copy(trustStoreType = Some(trustStoreType))
-
-  def withSslContext(sslContext: SSLContext): JettyClientBuilder[F] =
-    copy(sslContext = Some(sslContext))
-
-  def withSslParameters(sslParameters: SSLParameters): JettyClientBuilder[F] =
-    copy(sslParameters = Some(sslParameters))
 
   def withRequestTimeout(requestTimeout: Duration): JettyClientBuilder[F] =
     copy(requestTimeout = requestTimeout)
@@ -102,8 +90,6 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
   def resource: Resource[F, Client[F]] = {
     val acquire = Sync[F].delay {
       val cf = new SslContextFactory.Client
-      sslContext.foreach(cf.setSslContext)
-      sslParameters.foreach(cf.customize)
       keyStore foreach {
         case FileKeyStore(path, password) =>
           cf.setKeyStorePath(path)

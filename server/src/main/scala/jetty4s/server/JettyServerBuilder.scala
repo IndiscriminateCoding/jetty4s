@@ -34,8 +34,6 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
   trustStore: Option[SSLKeyStore] = None,
   trustStoreType: Option[String] = None,
   sniRequired: Boolean = true,
-  sslContext: Option[SSLContext] = None,
-  sslParameters: Option[SSLParameters] = None,
   clientAuth: SSLClientAuthMode = SSLClientAuthMode.NotRequested,
   handler: Option[jetty.Handler] = None
 ) {
@@ -50,8 +48,6 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
     trustStore: Option[SSLKeyStore] = trustStore,
     trustStoreType: Option[String] = trustStoreType,
     sniRequired: Boolean = sniRequired,
-    sslContext: Option[SSLContext] = sslContext,
-    sslParameters: Option[SSLParameters] = sslParameters,
     clientAuth: SSLClientAuthMode = clientAuth,
     handler: Option[jetty.Handler] = handler
   ): JettyServerBuilder[F] = new JettyServerBuilder[F](
@@ -65,8 +61,6 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
     trustStore = trustStore,
     trustStoreType = trustStoreType,
     sniRequired = sniRequired,
-    sslContext = sslContext,
-    sslParameters = sslParameters,
     clientAuth = clientAuth,
     handler = handler
   )
@@ -105,12 +99,6 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
 
   def withSniRequired(sniRequired: Boolean): JettyServerBuilder[F] =
     copy(sniRequired = sniRequired)
-
-  def withSslContext(sslContext: SSLContext): JettyServerBuilder[F] =
-    copy(sslContext = Some(sslContext))
-
-  def withSslParameters(sslParameters: SSLParameters): JettyServerBuilder[F] =
-    copy(sslParameters = Some(sslParameters))
 
   def withClientAuth(clientAuth: SSLClientAuthMode): JettyServerBuilder[F] =
     copy(clientAuth = clientAuth)
@@ -155,8 +143,6 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
         val cf = new SslContextFactory.Server
 
         cf.setSniRequired(sniRequired)
-        sslContext.foreach(cf.setSslContext)
-        sslParameters.foreach(cf.customize)
         clientAuth match {
           case SSLClientAuthMode.NotRequested => ()
           case SSLClientAuthMode.Requested =>
