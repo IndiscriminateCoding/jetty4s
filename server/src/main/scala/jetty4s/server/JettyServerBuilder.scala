@@ -5,7 +5,6 @@ import java.nio.ByteBuffer
 
 import cats.effect._
 import fs2._
-import javax.net.ssl.{ SSLContext, SSLParameters }
 import jetty4s.common.SSLKeyStore
 import jetty4s.common.SSLKeyStore.{ FileKeyStore, JavaKeyStore }
 import org.eclipse.jetty.alpn.server.ALPNServerConnectionFactory
@@ -35,7 +34,9 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
   trustStoreType: Option[String] = None,
   sniRequired: Boolean = true,
   clientAuth: SSLClientAuthMode = SSLClientAuthMode.NotRequested,
-  handler: Option[jetty.Handler] = None
+  handler: Option[jetty.Handler] = None,
+  sendDateHeader: Boolean = true,
+  sendServerHeader: Boolean = true
 ) {
   private[this] def copy(
     http: Option[InetSocketAddress] = http,
@@ -49,7 +50,9 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
     trustStoreType: Option[String] = trustStoreType,
     sniRequired: Boolean = sniRequired,
     clientAuth: SSLClientAuthMode = clientAuth,
-    handler: Option[jetty.Handler] = handler
+    handler: Option[jetty.Handler] = handler,
+    sendDateHeader: Boolean = sendDateHeader,
+    sendServerHeader: Boolean = sendServerHeader
   ): JettyServerBuilder[F] = new JettyServerBuilder[F](
     http = http,
     https = https,
@@ -62,7 +65,9 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
     trustStoreType = trustStoreType,
     sniRequired = sniRequired,
     clientAuth = clientAuth,
-    handler = handler
+    handler = handler,
+    sendDateHeader = sendDateHeader,
+    sendServerHeader = sendServerHeader
   )
 
   def withHandler(handler: jetty.Handler): JettyServerBuilder[F] = copy(handler = Some(handler))
@@ -115,12 +120,19 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
   def bindHttps(port: Int = 8443, host: String = "0.0.0.0"): JettyServerBuilder[F] =
     bindSecureSocketAddress(InetSocketAddress.createUnresolved(host, port))
 
+  def withoutDateHeader: JettyServerBuilder[F] = copy(sendDateHeader = false)
+
+  def withoutServerHeader: JettyServerBuilder[F] = copy(sendServerHeader = false)
+
   def resource: Resource[F, List[Server[F]]] = {
     val acquire: F[jetty.Server] = Sync[F].delay {
       val s = threadPool.fold(new jetty.Server())(new jetty.Server(_))
+      val conf = new HttpConfiguration
+
+      conf.setSendDateHeader(sendDateHeader)
+      conf.setSendServerVersion(sendServerHeader)
 
       def httpConnector(socket: InetSocketAddress) = {
-        val conf = new HttpConfiguration
         val h1 = new HttpConnectionFactory(conf)
         val h2c = new HTTP2CServerConnectionFactory(conf)
         val conn = new jetty.ServerConnector(s, h1, h2c)
@@ -132,7 +144,6 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
       }
 
       def httpsConnector(socket: InetSocketAddress) = {
-        val conf = new HttpConfiguration
         val h1 = new HttpConnectionFactory(conf)
         val h2 = new HTTP2ServerConnectionFactory(conf)
         val alpn = new ALPNServerConnectionFactory()
