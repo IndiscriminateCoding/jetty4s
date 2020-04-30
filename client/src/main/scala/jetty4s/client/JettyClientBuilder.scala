@@ -5,7 +5,6 @@ import java.util.concurrent.{ Executor, TimeUnit }
 
 import cats.effect._
 import fs2._
-import javax.net.ssl.{ SSLContext, SSLParameters }
 import jetty4s.common.SSLKeyStore
 import jetty4s.common.SSLKeyStore._
 import org.eclipse.jetty.client._
@@ -27,7 +26,8 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
   keyStore: Option[SSLKeyStore] = None,
   keyStoreType: Option[String] = None,
   trustStore: Option[SSLKeyStore] = None,
-  trustStoreType: Option[String] = None
+  trustStoreType: Option[String] = None,
+  trustAll: Boolean = false
 ) {
   private[this] def copy(
     requestTimeout: Duration = requestTimeout,
@@ -40,7 +40,8 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
     keyStore: Option[SSLKeyStore] = keyStore,
     keyStoreType: Option[String] = keyStoreType,
     trustStore: Option[SSLKeyStore] = trustStore,
-    trustStoreType: Option[String] = trustStoreType
+    trustStoreType: Option[String] = trustStoreType,
+    trustAll: Boolean = trustAll
   ): JettyClientBuilder[F] = new JettyClientBuilder[F](
     requestTimeout = requestTimeout,
     idleTimeout = idleTimeout,
@@ -52,7 +53,8 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
     keyStore = keyStore,
     keyStoreType = keyStoreType,
     trustStore = trustStore,
-    trustStoreType = trustStoreType
+    trustStoreType = trustStoreType,
+    trustAll = trustAll
   )
 
   def withKeyStore(keyStore: SSLKeyStore): JettyClientBuilder[F] = copy(keyStore = Some(keyStore))
@@ -65,6 +67,9 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
 
   def withTrustStoreType(trustStoreType: String): JettyClientBuilder[F] =
     copy(trustStoreType = Some(trustStoreType))
+
+  def withoutTlsValidation: JettyClientBuilder[F] =
+    copy(trustAll = true)
 
   def withRequestTimeout(requestTimeout: Duration): JettyClientBuilder[F] =
     copy(requestTimeout = requestTimeout)
@@ -108,6 +113,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
           cf.setTrustStorePassword(password)
       }
       trustStoreType.foreach(cf.setTrustStoreType)
+      cf.setTrustAll(trustAll)
 
       val c =
         if (requestTimeout.isFinite) {
