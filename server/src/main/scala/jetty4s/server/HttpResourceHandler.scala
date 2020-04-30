@@ -1,5 +1,8 @@
 package jetty4s.server
 
+import java.net.InetSocketAddress
+
+import _root_.io.chrisdavenport.vault.Vault
 import cats.Applicative
 import cats.effect._
 import cats.effect.implicits._
@@ -47,7 +50,9 @@ private[server] class HttpResourceHandler[F[_]: ConcurrentEffect](
     ctx.setTimeout(asyncTimeout)
 
     baseReq.getHttpChannel.getEndPoint match {
-      case _: SslConnection#DecryptedEndPoint => baseReq.setScheme(HttpScheme.HTTPS.asString())
+      case _: SslConnection#DecryptedEndPoint =>
+        baseReq.setScheme(HttpScheme.HTTPS.asString())
+        baseReq.setSecure(true)
       case _ => /* empty */
     }
 
@@ -199,6 +204,11 @@ private object HttpResourceHandler {
       name <- r.getHeaderNames.asScala
       value <- r.getHeaders(name).asScala
     } yield Header(name, value)).toList),
-    body = body
+    body = body,
+    attributes = Vault.empty.insert(Request.Keys.ConnectionInfo, Request.Connection(
+      local = InetSocketAddress.createUnresolved(r.getLocalAddr, r.getLocalPort),
+      remote = InetSocketAddress.createUnresolved(r.getRemoteAddr, r.getRemotePort),
+      secure = r.isSecure
+    ))
   )
 }
