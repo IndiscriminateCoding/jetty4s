@@ -8,6 +8,7 @@ import fs2._
 import jetty4s.common.SSLKeyStore
 import jetty4s.common.SSLKeyStore._
 import org.eclipse.jetty.client._
+import org.eclipse.jetty.util.HttpCookieStore
 import org.eclipse.jetty.util.component.AbstractLifeCycle.AbstractLifeCycleListener
 import org.eclipse.jetty.util.component.LifeCycle
 import org.eclipse.jetty.util.ssl.SslContextFactory
@@ -136,6 +137,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
       c.setMaxRequestsQueuedPerDestination(maxRequestsQueued)
       resolver.foreach(r => c.setSocketAddressResolver(Resolver.asJetty(r)))
       executor.foreach(c.setExecutor)
+      c.setCookieStore(new HttpCookieStore.Empty)
       c.setFollowRedirects(false)
       c.setDefaultRequestContentType(null) // scalafix:ok
       c.start()
