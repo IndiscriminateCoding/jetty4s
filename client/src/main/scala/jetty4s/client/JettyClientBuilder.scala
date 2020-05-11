@@ -28,7 +28,8 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
   keyStoreType: Option[String] = None,
   trustStore: Option[SSLKeyStore] = None,
   trustStoreType: Option[String] = None,
-  trustAll: Boolean = false
+  trustAll: Boolean = false,
+  sslProvider: Option[String] = None
 ) {
   private[this] def copy(
     requestTimeout: Duration = requestTimeout,
@@ -42,7 +43,8 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
     keyStoreType: Option[String] = keyStoreType,
     trustStore: Option[SSLKeyStore] = trustStore,
     trustStoreType: Option[String] = trustStoreType,
-    trustAll: Boolean = trustAll
+    trustAll: Boolean = trustAll,
+    sslProvider: Option[String] = sslProvider
   ): JettyClientBuilder[F] = new JettyClientBuilder[F](
     requestTimeout = requestTimeout,
     idleTimeout = idleTimeout,
@@ -55,7 +57,8 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
     keyStoreType = keyStoreType,
     trustStore = trustStore,
     trustStoreType = trustStoreType,
-    trustAll = trustAll
+    trustAll = trustAll,
+    sslProvider = sslProvider
   )
 
   def withKeyStore(keyStore: SSLKeyStore): JettyClientBuilder[F] = copy(keyStore = Some(keyStore))
@@ -71,6 +74,9 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
 
   def withoutTlsValidation: JettyClientBuilder[F] =
     copy(trustAll = true)
+
+  def withSslProvider(sslProvider: String): JettyClientBuilder[F] =
+    copy(sslProvider = Some(sslProvider))
 
   def withRequestTimeout(requestTimeout: Duration): JettyClientBuilder[F] =
     copy(requestTimeout = requestTimeout)
@@ -115,6 +121,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
       }
       trustStoreType.foreach(cf.setTrustStoreType)
       cf.setTrustAll(trustAll)
+      sslProvider.foreach(cf.setProvider)
 
       val c =
         if (requestTimeout.isFinite) {
