@@ -34,6 +34,7 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
   trustStoreType: Option[String] = None,
   sniRequired: Boolean = true,
   clientAuth: SSLClientAuthMode = SSLClientAuthMode.NotRequested,
+  sslProvider: Option[String] = None,
   handler: Option[jetty.Handler] = None,
   sendDateHeader: Boolean = true,
   sendServerHeader: Boolean = true
@@ -50,6 +51,7 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
     trustStoreType: Option[String] = trustStoreType,
     sniRequired: Boolean = sniRequired,
     clientAuth: SSLClientAuthMode = clientAuth,
+    sslProvider: Option[String] = sslProvider,
     handler: Option[jetty.Handler] = handler,
     sendDateHeader: Boolean = sendDateHeader,
     sendServerHeader: Boolean = sendServerHeader
@@ -65,6 +67,7 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
     trustStoreType = trustStoreType,
     sniRequired = sniRequired,
     clientAuth = clientAuth,
+    sslProvider = sslProvider,
     handler = handler,
     sendDateHeader = sendDateHeader,
     sendServerHeader = sendServerHeader
@@ -107,6 +110,9 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
 
   def withClientAuth(clientAuth: SSLClientAuthMode): JettyServerBuilder[F] =
     copy(clientAuth = clientAuth)
+
+  def withSslProvider(sslProvider: String): JettyServerBuilder[F] =
+    copy(sslProvider = Some(sslProvider))
 
   def bindSocketAddress(socketAddress: InetSocketAddress): JettyServerBuilder[F] =
     copy(http = Some(socketAddress))
@@ -180,6 +186,7 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
             cf.setTrustStorePassword(password)
         }
         trustStoreType.foreach(cf.setTrustStoreType)
+        sslProvider.foreach(cf.setProvider)
 
         val ssl = new SslConnectionFactory(cf, alpn.getProtocol)
         val conn = new jetty.ServerConnector(s, ssl, alpn, h2, h1)
@@ -243,5 +250,5 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
 }
 
 object JettyServerBuilder {
-  def apply[F[_]: ConcurrentEffect] = new JettyServerBuilder[F]()
+  def apply[F[_] : ConcurrentEffect] = new JettyServerBuilder[F]()
 }
