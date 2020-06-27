@@ -46,7 +46,7 @@ class JettyServerBuilderSpec extends AnyFlatSpec with Matchers {
     bodyStream foreach { body =>
       val v = body.compile.toVector
       val res = jettyClient
-        .fetch(
+        .run(
           Request[IO](
             body = body,
             headers = Headers.of(Header("transfer-encoding", "chunked"))
@@ -56,7 +56,8 @@ class JettyServerBuilderSpec extends AnyFlatSpec with Matchers {
               scheme = Some(Scheme.http)
             )
           )
-        )(_.body.compile.toVector)
+        )
+        .use(_.body.compile.toVector)
         .unsafeRunSync()
       res shouldBe v
     }

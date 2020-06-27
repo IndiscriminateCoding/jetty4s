@@ -16,7 +16,7 @@ class JettyClientBuilderSpec extends AnyFlatSpec with Matchers with BeforeAndAft
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
   implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
-  private val stop = BlazeServerBuilder[IO]
+  private val stop = BlazeServerBuilder[IO](ExecutionContext.global)
     .bindHttp(8080)
     .withHttpApp(HttpApp(r => IO.pure(Response[IO](body = r.body))))
     .allocated
