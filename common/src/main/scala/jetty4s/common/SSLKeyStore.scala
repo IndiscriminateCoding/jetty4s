@@ -2,7 +2,7 @@ package jetty4s.common
 
 import java.security.KeyStore
 
-trait SSLKeyStore
+sealed trait SSLKeyStore
 
 object SSLKeyStore {
   case class FileKeyStore(path: String, password: String) extends SSLKeyStore
