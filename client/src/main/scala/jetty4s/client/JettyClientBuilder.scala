@@ -18,7 +18,7 @@ import scala.concurrent.duration._
 
 final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
   requestTimeout: Duration = 15.seconds,
-  idleTimeout: FiniteDuration = 60.seconds,
+  idleTimeout: FiniteDuration = 1.minute,
   connectTimeout: FiniteDuration = 5.seconds,
   maxConnections: Int = 64,
   maxRequestsQueued: Int = 128,

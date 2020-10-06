@@ -20,14 +20,14 @@ import org.eclipse.jetty.{ server => jetty }
 import org.http4s.server.{ SSLClientAuthMode, Server, defaults }
 import org.http4s.{ HttpApp, Request, Response }
 
-import scala.concurrent.duration.{ Duration, FiniteDuration }
+import scala.concurrent.duration._
 
 final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
   http: Option[InetSocketAddress] = None,
   https: Option[InetSocketAddress] = None,
   threadPool: Option[ThreadPool] = None,
-  asyncTimeout: Duration = Duration.Inf,
-  idleTimeout: Option[FiniteDuration] = None,
+  asyncTimeout: Duration = 15.seconds,
+  idleTimeout: Duration = 1.minute,
   keyStore: Option[SSLKeyStore] = None,
   keyStoreType: Option[String] = None,
   trustStore: Option[SSLKeyStore] = None,
@@ -44,7 +44,7 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
     https: Option[InetSocketAddress] = https,
     threadPool: Option[ThreadPool] = threadPool,
     asyncTimeout: Duration = asyncTimeout,
-    idleTimeout: Option[FiniteDuration] = idleTimeout,
+    idleTimeout: Duration = idleTimeout,
     keyStore: Option[SSLKeyStore] = keyStore,
     keyStoreType: Option[String] = keyStoreType,
     trustStore: Option[SSLKeyStore] = trustStore,
@@ -91,8 +91,8 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
   def withAsyncTimeout(asyncTimeout: Duration): JettyServerBuilder[F] =
     copy(asyncTimeout = asyncTimeout)
 
-  def withIdleTimeout(idleTimeout: FiniteDuration): JettyServerBuilder[F] =
-    copy(idleTimeout = Some(idleTimeout))
+  def withIdleTimeout(idleTimeout: Duration): JettyServerBuilder[F] =
+    copy(idleTimeout = idleTimeout)
 
   def withKeyStore(keyStore: SSLKeyStore): JettyServerBuilder[F] = copy(keyStore = Some(keyStore))
 
@@ -143,7 +143,7 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
         val h2c = new HTTP2CServerConnectionFactory(conf)
         val conn = new jetty.ServerConnector(s, h1, h2c)
 
-        idleTimeout.foreach(t => conn.setIdleTimeout(t.toMillis))
+        if (idleTimeout.isFinite) conn.setIdleTimeout(idleTimeout.toMillis)
         conn.setPort(socket.getPort)
         conn.setHost(socket.getHostName)
         conn
@@ -191,7 +191,7 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
         val ssl = new SslConnectionFactory(cf, alpn.getProtocol)
         val conn = new jetty.ServerConnector(s, ssl, alpn, h2, h1)
 
-        idleTimeout.foreach(t => conn.setIdleTimeout(t.toMillis))
+        if (idleTimeout.isFinite) conn.setIdleTimeout(idleTimeout.toMillis)
         conn.setPort(socket.getPort)
         conn.setHost(socket.getHostName)
         conn
