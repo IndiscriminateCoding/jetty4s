@@ -1,5 +1,6 @@
 Global / useSuperShell := false
 Global / onChangedBuildSource := ReloadOnSourceChanges
+Global / excludeLintKeys += publishMavenStyle
 
 val scalaVersions = List("2.13.3", "2.12.10")
 

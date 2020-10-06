@@ -226,13 +226,13 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
 
     Resource.make[F, jetty.Server](acquire)(release).map { _ =>
       def insecure(s: InetSocketAddress) = new Server[F] {
-        def address: InetSocketAddress = defaults.SocketAddress
+        def address: InetSocketAddress = s
 
         def isSecure: Boolean = false
       }
 
       def secure(s: InetSocketAddress) = new Server[F] {
-        def address: InetSocketAddress = defaults.SocketAddress
+        def address: InetSocketAddress = s
 
         def isSecure: Boolean = true
       }
