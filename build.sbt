@@ -4,7 +4,7 @@ Global / excludeLintKeys += publishMavenStyle
 
 val scalaVersions = List("2.13.3", "2.12.10")
 
-ThisBuild / version := "0.0.9-SNAPSHOT"
+ThisBuild / version := "0.0.10-SNAPSHOT"
 ThisBuild / organization := "com.github.IndiscriminateCoding"
 ThisBuild / scalaVersion := scalaVersions.head
 
