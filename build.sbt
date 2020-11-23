@@ -45,7 +45,7 @@ val scala213options = Seq(
 )
 
 val http4sVersion = "0.21.11"
-val jettyVersion = "9.4.34.v20201102"
+val jettyVersion = "9.4.35.v20201120"
 val scalatestVersion = "3.2.3"
 
 lazy val jetty4s = (project in file("."))
