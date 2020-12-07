@@ -5,7 +5,7 @@ import cats.effect.implicits._
 import cats.effect.{ ConcurrentEffect, ExitCase, Resource, Sync }
 import cats.implicits._
 import org.eclipse.jetty.client.HttpClient
-import org.eclipse.jetty.http.{ HttpVersion => JHttpVersion }
+import org.eclipse.jetty.http.{ HttpFields, HttpVersion => JHttpVersion }
 import org.http4s.client.Client
 import org.http4s.{ HttpVersion, Response }
 
@@ -23,9 +23,11 @@ object FromHttpClient {
             case HttpVersion.`HTTP/2.0` => JHttpVersion.HTTP_2
             case _ => JHttpVersion.HTTP_1_1
           })
-          .content(h)
+          .headers { (fields: HttpFields.Mutable) =>
+            for (h <- r.headers) fields.add(h.name.toString, h.value): Unit
+          }
+          .body(h)
       })
-      _ = for (h <- r.headers) req.header(h.name.toString, h.value): Unit
       _ <- Resource.make(h.write(r.body).start)(_.cancel)
       res <- {
         def abort(t: Throwable): F[Unit] = Sync[F].delay(req.abort(t): Unit)

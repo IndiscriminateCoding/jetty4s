@@ -10,11 +10,11 @@ import cats.implicits._
 import fs2.Chunk.Bytes
 import fs2._
 import fs2.concurrent.Queue
-import javax.servlet.http.{ HttpServletRequest, HttpServletResponse }
-import javax.servlet.{ ReadListener, WriteListener }
+import jakarta.servlet.http.{ HttpServletRequest, HttpServletResponse }
+import jakarta.servlet.{ ReadListener, WriteListener }
 import jetty4s.common.RepeatedReadException
 import jetty4s.server.HttpResourceHandler._
-import org.eclipse.jetty.http.HttpScheme
+import org.eclipse.jetty.http.{ HttpScheme, HttpURI }
 import org.eclipse.jetty.io.ssl.SslConnection
 import org.eclipse.jetty.server.handler.AbstractHandler
 import org.eclipse.jetty.{ server => jetty }
@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 
-private[server] class HttpResourceHandler[F[_]: ConcurrentEffect](
+private[server] class HttpResourceHandler[F[_] : ConcurrentEffect](
   app: Request[F] => Resource[F, Response[F]],
   asyncTimeout: Long,
   chunkSize: Int = 1024,
@@ -51,7 +51,7 @@ private[server] class HttpResourceHandler[F[_]: ConcurrentEffect](
 
     baseReq.getHttpChannel.getEndPoint match {
       case _: SslConnection#DecryptedEndPoint =>
-        baseReq.setScheme(HttpScheme.HTTPS.asString())
+        baseReq.setHttpURI(HttpURI.build(baseReq.getHttpURI).scheme(HttpScheme.HTTPS))
         baseReq.setSecure(true)
       case _ => /* empty */
     }

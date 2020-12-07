@@ -8,6 +8,8 @@ import fs2._
 import jetty4s.common.SSLKeyStore
 import jetty4s.common.SSLKeyStore._
 import org.eclipse.jetty.client._
+import org.eclipse.jetty.client.dynamic.HttpClientTransportDynamic
+import org.eclipse.jetty.io.ClientConnector
 import org.eclipse.jetty.util.HttpCookieStore
 import org.eclipse.jetty.util.component.AbstractLifeCycle.AbstractLifeCycleListener
 import org.eclipse.jetty.util.component.LifeCycle
@@ -123,16 +125,22 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
       cf.setTrustAll(trustAll)
       sslProvider.foreach(cf.setProvider)
 
+      val transport = {
+        val conn = new ClientConnector
+        conn.setSslContextFactory(cf)
+
+        new HttpClientTransportDynamic(conn)
+      }
       val c =
         if (requestTimeout.isFinite) {
-          new HttpClient(cf) {
+          new HttpClient(transport) {
             override def newHttpRequest(c: HttpConversation, u: URI): HttpRequest = {
               val r = super.newHttpRequest(c, u)
               r.timeout(requestTimeout.toMillis, TimeUnit.MILLISECONDS)
               r
             }
           }
-        } else new HttpClient(cf)
+        } else new HttpClient(transport)
 
       c.getTransport.setConnectionPoolFactory(dst =>
         new RoundRobinConnectionPool(dst, maxConnections, dst)
@@ -152,7 +160,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
     }
 
     def release(c: HttpClient): F[Unit] = Async[F].async { cb =>
-      c.addLifeCycleListener(new AbstractLifeCycleListener {
+      c.addEventListener(new AbstractLifeCycleListener {
         override def lifeCycleStopped(lc: LifeCycle): Unit = cb(Right(()))
 
         override def lifeCycleFailure(lc: LifeCycle, t: Throwable): Unit = cb(Left(t))

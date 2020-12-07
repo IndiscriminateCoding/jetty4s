@@ -204,8 +204,6 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
           https foreach (socket => s.addConnector(httpsConnector(socket)))
       }
       s.setErrorHandler(new ErrorHandler {
-        override def badMessageError(code: Int, reason: String, f: HttpFields): ByteBuffer = null
-
         override def errorPageForMethod(method: String): Boolean = false
       })
       s.setHandler(
@@ -216,7 +214,7 @@ final class JettyServerBuilder[F[_] : ConcurrentEffect] private(
     }
 
     def release(s: jetty.Server): F[Unit] = Async[F].async { cb =>
-      s.addLifeCycleListener(new AbstractLifeCycleListener {
+      s.addEventListener(new AbstractLifeCycleListener {
         override def lifeCycleStopped(lc: LifeCycle): Unit = cb(Right(()))
 
         override def lifeCycleFailure(lc: LifeCycle, t: Throwable): Unit = cb(Left(t))

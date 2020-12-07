@@ -14,7 +14,7 @@ import jetty4s.client.StreamHandler._
 import jetty4s.common.RepeatedReadException
 import org.eclipse.jetty.client.api.Response._
 import org.eclipse.jetty.client.api.{ Result, Response => JResponse }
-import org.eclipse.jetty.client.util.DeferredContentProvider
+import org.eclipse.jetty.client.util.AsyncRequestContent
 import org.eclipse.jetty.http.{ HttpVersion => JHttpVersion }
 import org.eclipse.jetty.util.Callback
 import org.http4s._
@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConverters._
 
 private[client] final class StreamHandler[F[_] : Effect] private(q: Queue[F, Any])
-  extends DeferredContentProvider
+  extends AsyncRequestContent
     with HeadersListener
     with DemandedContentListener
     with CompleteListener {
