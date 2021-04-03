@@ -44,9 +44,9 @@ val scala213options = Seq(
   "-Ywarn-value-discard"
 )
 
-val http4sVersion = "0.21.15"
-val jettyVersion = "11.0.2"
-val scalatestVersion = "3.2.3"
+val http4sVersion = "0.21.21"
+val jettyVersion = "11.0.0"
+val scalatestVersion = "3.2.7"
 
 lazy val jetty4s = (project in file("."))
   .aggregate(common, client, server)
