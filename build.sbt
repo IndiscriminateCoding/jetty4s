@@ -98,7 +98,7 @@ lazy val server = (project in file("server"))
       "org.eclipse.jetty" % "jetty-alpn-server" % jettyVersion,
       "org.eclipse.jetty.http2" % "http2-server" % jettyVersion,
 
-      "ch.qos.logback" % "logback-classic" % "1.2.3" % Test,
+      "ch.qos.logback" % "logback-classic" % "1.2.5" % Test,
       "org.scalatest" %% "scalatest" % scalatestVersion % Test
     )
   )
