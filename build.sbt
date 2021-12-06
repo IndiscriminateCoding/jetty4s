@@ -6,8 +6,8 @@ val scalaVersions = List("2.13.7", "2.12.15")
 
 ThisBuild / version := "0.0.11-SNAPSHOT"
 ThisBuild / organization := "com.github.IndiscriminateCoding"
+ThisBuild / crossScalaVersions := scalaVersions
 ThisBuild / scalaVersion := scalaVersions.head
-
 ThisBuild / libraryDependencies +=
   compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1")
 
@@ -57,7 +57,6 @@ lazy val jetty4s = (project in file("."))
 
 lazy val common = (project in file("common"))
   .settings(
-    crossScalaVersions := scalaVersions,
     scalacOptions := {
       if (scalaVersion.value.startsWith("2.12.")) scala212options
       else scala213options
@@ -68,7 +67,6 @@ lazy val common = (project in file("common"))
 
 lazy val client = (project in file("client"))
   .settings(
-    crossScalaVersions := scalaVersions,
     scalacOptions := {
       if (scalaVersion.value.startsWith("2.12.")) scala212options
       else scala213options
@@ -86,7 +84,6 @@ lazy val client = (project in file("client"))
 
 lazy val server = (project in file("server"))
   .settings(
-    crossScalaVersions := scalaVersions,
     scalacOptions := {
       if (scalaVersion.value.startsWith("2.12.")) scala212options
       else scala213options
