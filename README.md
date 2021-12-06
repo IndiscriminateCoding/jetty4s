@@ -16,7 +16,7 @@ Now you can use `jetty4s.client.JettyClientBuilder` to create a `Client[F]`:
 ```scala
 val clientResource: Resource[IO, Client[IO]] = JettyClientBuilder[IO]
   .withRequestTimeout(FiniteDuration(5, TimeUnit.SECONDS))
-  .withExecutor(Executors.newWorkStealingPool())
+  .withExecutor(new QueuedThreadPool(16))
   .resource
 ```
 
