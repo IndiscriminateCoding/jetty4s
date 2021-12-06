@@ -1,9 +1,7 @@
 package jetty4s.client
 
-import java.net.URI
-import java.util.concurrent.{ Executor, TimeUnit }
-
 import cats.effect._
+import cats.effect.std.Dispatcher
 import fs2._
 import jetty4s.common.SSLKeyStore
 import jetty4s.common.SSLKeyStore._
@@ -16,9 +14,11 @@ import org.eclipse.jetty.util.component.LifeCycle
 import org.eclipse.jetty.util.ssl.SslContextFactory
 import org.http4s.client.Client
 
+import java.net.URI
+import java.util.concurrent.{ Executor, TimeUnit }
 import scala.concurrent.duration._
 
-final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
+final class JettyClientBuilder[F[_] : Async] private(
   requestTimeout: Duration = 15.seconds,
   idleTimeout: FiniteDuration = 1.minute,
   connectTimeout: FiniteDuration = 5.seconds,
@@ -101,7 +101,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
   def withMaxRequestsQueued(maxRequestsQueued: Int): JettyClientBuilder[F] =
     copy(maxRequestsQueued = maxRequestsQueued)
 
-  def resource: Resource[F, Client[F]] = {
+  def resource: Resource[F, Client[F]] = Dispatcher[F].flatMap { dispatcher =>
     val acquire = Sync[F].delay {
       val cf = new SslContextFactory.Client
       keyStore foreach {
@@ -150,7 +150,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
       c.setConnectTimeout(connectTimeout.toMillis)
       c.setMaxConnectionsPerDestination(maxConnections)
       c.setMaxRequestsQueuedPerDestination(maxRequestsQueued)
-      resolver.foreach(r => c.setSocketAddressResolver(Resolver.asJetty(r)))
+      resolver.foreach(r => c.setSocketAddressResolver(Resolver.asJetty(r, dispatcher)))
       executor.foreach(c.setExecutor)
       c.setCookieStore(new HttpCookieStore.Empty)
       c.setFollowRedirects(false)
@@ -159,7 +159,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
       c
     }
 
-    def release(c: HttpClient): F[Unit] = Async[F].async { cb =>
+    def release(c: HttpClient): F[Unit] = Async[F].async_ { cb =>
       c.addEventListener(new AbstractLifeCycleListener {
         override def lifeCycleStopped(lc: LifeCycle): Unit = cb(Right(()))
 
@@ -168,7 +168,7 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
       c.stop()
     }
 
-    Resource.make[F, HttpClient](acquire)(release).map(FromHttpClient[F])
+    Resource.make[F, HttpClient](acquire)(release).map(c => FromHttpClient[F](c, dispatcher))
   }
 
   def allocated: F[(Client[F], F[Unit])] = resource.allocated
@@ -177,5 +177,5 @@ final class JettyClientBuilder[F[_] : ConcurrentEffect] private(
 }
 
 object JettyClientBuilder {
-  def apply[F[_] : ConcurrentEffect]: JettyClientBuilder[F] = new JettyClientBuilder()
+  def apply[F[_] : Async]: JettyClientBuilder[F] = new JettyClientBuilder()
 }

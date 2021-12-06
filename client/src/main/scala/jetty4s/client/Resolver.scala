@@ -1,11 +1,12 @@
 package jetty4s.client
 
-import java.net.InetSocketAddress
-import java.util
-
-import cats.effect.{ Effect, IO }
+import cats.effect._
+import cats.effect.std.Dispatcher
+import cats.implicits._
 import org.eclipse.jetty.util.{ Promise, SocketAddressResolver }
 
+import java.net.InetSocketAddress
+import java.util
 import scala.collection.JavaConverters._
 
 trait Resolver[F[_]] {
@@ -13,11 +14,12 @@ trait Resolver[F[_]] {
 }
 
 object Resolver {
-  def asJetty[F[_] : Effect](r: Resolver[F]): SocketAddressResolver =
-    (host: String, port: Int, res: Promise[util.List[InetSocketAddress]]) => Effect[F]
-      .runAsync(r.resolve(host, port)) {
-        case Left(t) => IO delay res.failed(t)
-        case Right(hs) => IO delay res.succeeded(hs.asJava)
+  def asJetty[F[_] : Sync](r: Resolver[F], d: Dispatcher[F]): SocketAddressResolver =
+    (host: String, port: Int, res: Promise[util.List[InetSocketAddress]]) =>
+      d.unsafeRunAndForget {
+        r.resolve(host, port).attempt.flatMap {
+          case Left(t) => Sync[F] delay res.failed(t)
+          case Right(hs) => Sync[F] delay res.succeeded(hs.asJava)
+        }
       }
-      .unsafeRunSync()
 }

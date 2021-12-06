@@ -1,15 +1,10 @@
 package jetty4s.server
 
-import java.net.InetSocketAddress
-
-import _root_.io.chrisdavenport.vault.Vault
-import cats.Applicative
 import cats.effect._
-import cats.effect.implicits._
+import cats.effect.std.{ Dispatcher, Queue }
 import cats.implicits._
-import fs2.Chunk.Bytes
+import com.comcast.ip4s.{ IpAddress, Port, SocketAddress }
 import fs2._
-import fs2.concurrent.Queue
 import jakarta.servlet.http.{ HttpServletRequest, HttpServletResponse }
 import jakarta.servlet.{ ReadListener, WriteListener }
 import jetty4s.common.RepeatedReadException
@@ -20,23 +15,24 @@ import org.eclipse.jetty.server.handler.AbstractHandler
 import org.eclipse.jetty.{ server => jetty }
 import org.http4s._
 import org.slf4j.LoggerFactory
+import org.typelevel.ci.CIString
+import org.typelevel.vault.Vault
 
 import scala.collection.JavaConverters._
 
-private[server] class HttpResourceHandler[F[_] : ConcurrentEffect](
+private[server] class HttpResourceHandler[F[_] : Async](
   app: Request[F] => Resource[F, Response[F]],
   asyncTimeout: Long,
+  dispatcher: Dispatcher[F],
   chunkSize: Int = 1024,
   queueSizeBounds: Int = 4
 ) extends AbstractHandler {
   private[this] val logger = LoggerFactory.getLogger(this.getClass)
 
-  private[this] def unsafeFork[A](fa: F[A], op: String): Unit = fa
-    .runAsync {
-      case Right(_) => IO.unit
-      case Left(t) => IO.delay(logger.debug(s"unsafeFork/$op failed!", t))
+  private[this] def unsafeFork[A](fa: F[A], op: String): Unit =
+    dispatcher.unsafeRunAndForget {
+      fa.onError { case t => Sync[F].delay(logger.debug(s"unsafeFork/$op failed!", t)) }
     }
-    .unsafeRunSync()
 
   def handle(
     target: String,
@@ -61,40 +57,40 @@ private[server] class HttpResourceHandler[F[_] : ConcurrentEffect](
 
       var buf = newBuf()
       val in = req.getInputStream
-      val store = Queue.bounded[F, Any](queueSizeBounds).toIO.unsafeRunSync()
+      val store = dispatcher.unsafeRunSync(Queue.bounded[F, Any](queueSizeBounds))
 
       in.setReadListener(new ReadListener {
         def onDataAvailable(): Unit = {
           def loop: F[Unit] =
             Sync[F].delay(in.read(buf)).flatMap {
-              case len if len < 0 => Applicative[F].unit
+              case len if len < 0 => Sync[F].unit
               case len =>
                 if (len == 0) logger.debug("InputStream#read(...) == 0")
                 val bytes =
                   if (len == chunkSize) {
-                    val res = Bytes(buf)
+                    val res = Chunk.array(buf)
                     buf = newBuf()
                     res
-                  } else Bytes(java.util.Arrays.copyOf(buf, len))
-                store.enqueue1(bytes) >> {
+                  } else Chunk.array(java.util.Arrays.copyOf(buf, len))
+                store.offer(bytes) >> {
                   if (in.isReady) loop
-                  else Applicative[F].unit
+                  else Sync[F].unit
                 }
             }
 
           unsafeFork(loop, "read/loop")
         }
 
-        def onAllDataRead(): Unit = unsafeFork(store.enqueue1(()), "request/enqueue")
+        def onAllDataRead(): Unit = unsafeFork(store.offer(()), "request/enqueue")
 
-        def onError(t: Throwable): Unit = unsafeFork(store enqueue1 t, "request/enqueue")
+        def onError(t: Throwable): Unit = unsafeFork(store offer t, "request/enqueue")
       })
 
-      def loop: Pull[F, Byte, Unit] = Pull.eval(store.dequeue1).flatMap {
-        case b: Bytes => Pull.output(b) >> loop
+      def loop: Pull[F, Byte, Unit] = Pull.eval(store.take).flatMap {
+        case b: Chunk[_] => Pull.output(b.asInstanceOf[Chunk[Byte]]) >> loop
         case t: Throwable =>
-          Pull.eval(store.enqueue1(RepeatedReadException)) >> Pull.raiseError[F](t)
-        case () => Pull.eval(store.enqueue1(RepeatedReadException))
+          Pull.eval(store offer RepeatedReadException) >> Pull.raiseError[F](t)
+        case () => Pull.eval(store offer RepeatedReadException)
         case x => throw new IllegalStateException(s"Expectation failed (request): $x")
       }
 
@@ -103,23 +99,23 @@ private[server] class HttpResourceHandler[F[_] : ConcurrentEffect](
 
     def makeWriter(): Pipe[F, Byte, Unit] = {
       val out = res.getOutputStream
-      val store = Queue.bounded[F, Any](queueSizeBounds).toIO.unsafeRunSync()
+      val store = dispatcher.unsafeRunSync(Queue.bounded[F, Any](queueSizeBounds))
       @volatile var err: Throwable = null // scalafix:ok
 
       out.setWriteListener(new WriteListener {
         def onWritePossible(): Unit = {
           def flush() =
             out.isReady match {
-              case false => Applicative[F].unit
+              case false => Sync[F].unit
               case true if !autoFlush => loop
               case true /* if autoFlush */ =>
                 out.flush()
-                if (out.isReady) loop else Applicative[F].unit
+                if (out.isReady) loop else Sync[F].unit
             }
 
-          def loop: F[Unit] = store.dequeue1.flatMap {
-            case x: Chunk.Bytes =>
-              out.write(x.values, x.offset, x.length)
+          def loop: F[Unit] = store.take.flatMap {
+            case x: Chunk.ArraySlice[_] =>
+              out.write(x.values.asInstanceOf[Array[Byte]], x.offset, x.length)
               flush()
             case x: Chunk[_] =>
               out.write(x.asInstanceOf[Chunk[Byte]].toArray)
@@ -143,9 +139,9 @@ private[server] class HttpResourceHandler[F[_] : ConcurrentEffect](
           .evalMap[F, Unit] {
             case _ if err != null => // scalafix:ok
               Sync[F].raiseError(err)
-            case c => store.enqueue1(c)
+            case c => store.offer(c)
           }
-          .onFinalizeWeak(store.enqueue1(()))
+          .onFinalizeWeak(store.offer(()))
     }
 
     val request = fromHttpServletRequest(req, if (requestIsEmpty) EmptyBody else requestBody)
@@ -162,24 +158,24 @@ private[server] class HttpResourceHandler[F[_] : ConcurrentEffect](
       )
     val writer = makeWriter()
 
-    Stream
+    val run = Stream
       .resource(resource)
       .flatMap { response =>
         Stream.suspend {
           autoFlush = response.isChunked
           res.setStatus(response.status.code)
-          for (header <- response.headers.toList if header.isNot(headers.`Transfer-Encoding`))
-            res.addHeader(header.name.toString, header.value)
+          response.headers.foreach { hdr =>
+            if (hdr.name != headers.`Transfer-Encoding`.name)
+              res.addHeader(hdr.name.toString, hdr.value)
+          }
           writer(response.body)
         }
       }
       .compile
       .drain
-      .runAsync {
-        case Right(_) => IO.unit
-        case Left(t) => IO.delay { logger.debug("Error sending response body", t) }
-      }
-      .unsafeRunSync()
+      .onError { case t => Sync[F].delay(logger.debug("Error sending response body", t)) }
+
+    dispatcher.unsafeRunAndForget(run)
   }
 }
 
@@ -203,12 +199,20 @@ private object HttpResourceHandler {
     headers = Headers((for {
       name <- r.getHeaderNames.asScala
       value <- r.getHeaders(name).asScala
-    } yield Header(name, value)).toList),
+    } yield Header.Raw(CIString(name), value)).toList),
     body = body,
     attributes = Vault.empty.insert(Request.Keys.ConnectionInfo, Request.Connection(
-      local = InetSocketAddress.createUnresolved(r.getLocalAddr, r.getLocalPort),
-      remote = InetSocketAddress.createUnresolved(r.getRemoteAddr, r.getRemotePort),
+      local = SocketAddress(
+        IpAddress.fromString(strip(r.getLocalAddr)).get,
+        Port.fromInt(r.getLocalPort).get,
+      ),
+      remote = SocketAddress(
+        IpAddress.fromString(strip(r.getRemoteAddr)).get,
+        Port.fromInt(r.getRemotePort).get,
+      ),
       secure = r.isSecure
     ))
   )
+
+  private def strip(s: String) = s.stripPrefix("[").stripSuffix("]")
 }

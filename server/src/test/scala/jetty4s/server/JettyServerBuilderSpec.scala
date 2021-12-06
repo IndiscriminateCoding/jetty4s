@@ -1,6 +1,7 @@
 package jetty4s.server
 
 import cats.effect._
+import cats.effect.unsafe.implicits.global
 import fs2._
 import jetty4s.client.JettyClientBuilder
 import org.http4s.Uri.Scheme
@@ -8,12 +9,7 @@ import org.http4s._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.ExecutionContext
-
 class JettyServerBuilderSpec extends AnyFlatSpec with Matchers {
-  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
-
   private val port = 11118
 
   private val sizes = List(1, 2, 178, 1023, 1024, 1025, 16000)
@@ -24,7 +20,7 @@ class JettyServerBuilderSpec extends AnyFlatSpec with Matchers {
   } yield List(a, b, c)
     .map(sz =>
       Stream
-        .chunk(Chunk.bytes(Array.fill(sz)((scala.util.Random.nextInt(256) - 128).toByte)))
+        .chunk(Chunk.array(Array.fill(sz)((scala.util.Random.nextInt(256) - 128).toByte)))
     )
     .reduce(_ ++ _)
 

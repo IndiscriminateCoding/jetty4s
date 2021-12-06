@@ -2,9 +2,9 @@ Global / useSuperShell := false
 Global / onChangedBuildSource := ReloadOnSourceChanges
 Global / excludeLintKeys += publishMavenStyle
 
-val scalaVersions = List("2.13.4", "2.12.12")
+val scalaVersions = List("2.13.7", "2.12.15")
 
-ThisBuild / version := "0.0.10-SNAPSHOT"
+ThisBuild / version := "0.0.11-SNAPSHOT"
 ThisBuild / organization := "com.github.IndiscriminateCoding"
 ThisBuild / scalaVersion := scalaVersions.head
 
@@ -44,9 +44,9 @@ val scala213options = Seq(
   "-Ywarn-value-discard"
 )
 
-val http4sVersion = "0.21.21"
-val jettyVersion = "11.0.2"
-val scalatestVersion = "3.2.7"
+val http4sVersion = "0.23.6"
+val jettyVersion = "11.0.7"
+val scalatestVersion = "3.2.10"
 
 lazy val jetty4s = (project in file("."))
   .aggregate(common, client, server)
@@ -98,7 +98,6 @@ lazy val server = (project in file("server"))
       "org.eclipse.jetty" % "jetty-alpn-server" % jettyVersion,
       "org.eclipse.jetty.http2" % "http2-server" % jettyVersion,
 
-      "ch.qos.logback" % "logback-classic" % "1.2.3" % Test,
       "org.scalatest" %% "scalatest" % scalatestVersion % Test
     )
   )
