@@ -2,7 +2,7 @@ Global / useSuperShell := false
 Global / onChangedBuildSource := ReloadOnSourceChanges
 Global / excludeLintKeys += publishMavenStyle
 
-val scalaVersions = List("2.13.7", "2.12.15")
+val scalaVersions = List("2.13.10", "2.12.15")
 
 ThisBuild / version := "0.0.11-SNAPSHOT"
 ThisBuild / organization := "com.github.IndiscriminateCoding"
