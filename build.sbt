@@ -44,7 +44,7 @@ val scala213options = Seq(
   "-Ywarn-value-discard"
 )
 
-val http4sVersion = "0.23.7"
+val http4sVersion = "0.23.26"
 val jettyVersion = "11.0.7"
 val scalatestVersion = "3.2.10"
 
